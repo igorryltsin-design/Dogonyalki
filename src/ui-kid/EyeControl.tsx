@@ -20,10 +20,12 @@ export function EyeControl({ eye, onChange }: { eye: EyeConfig; onChange: (next:
           камера {camera.fovDeg}°
         </button>
       </div>
-      <label>
-        помехи в глазу
+      <label title="Один и тот же глаз и одна та же ручка помех — и для мухи, и для сети школьника">
+        <span className="eyebar__cap">помехи</span>
+        <span className="eyebar__cap-long"> в глазу</span>
         <input
           type="range"
+          aria-label="помехи в глазу"
           min={0}
           max={0.6}
           step={0.05}

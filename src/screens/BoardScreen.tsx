@@ -4,7 +4,7 @@ import { resetFly, trainFly } from '../trainLocal'
 import { loadNet, predictAzEl } from '../kidBrain'
 import { eyeFingerprint, type EyeConfig } from '../types'
 
-/** Экран «Доска»: десять одинаковых погонев для каждого догоняющего под
+/** Экран «Доска»: десять одинаковых погонь для каждого догоняющего под
  *  выбранный в шапке глаз. Меры ровно две, как в курсе: «догнал из 10» и
  *  «ошибка взгляда, °». Ряд «врождённый Огонёк» честно сбрасывает муху к
  *  рефлексу — после доски её надо натренировать заново на экране «Глаз». */
@@ -38,7 +38,7 @@ export function BoardScreen({ eye }: { eye: EyeConfig }) {
         setStage('тренирую муху…')
         await trainFly(eye, 30)
       }
-      setStage(`${row.name}: десять погонев…`)
+      setStage(`${row.name}: десять погонь…`)
       next[row.key] = await runContest(row.pilot, eye, {
         runs: 10,
         predict: row.pilot === 'kid' && net ? (img) => predictAzEl(net, img, eye) : undefined,

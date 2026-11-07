@@ -2,7 +2,7 @@
  *  одного региона, который игра не освещает ничем реальным. */
 
 import { describe, expect, it } from 'vitest'
-import { CHANNELS, LINKS, REGIONS, channelValue, linkWeight, regionActivity } from './anatomy'
+import { CHANNELS, DRAWN_NEURONS, LINKS, REAL_NEURONS, REGIONS, channelValue, linkWeight, regionActivity } from './anatomy'
 import { getW } from './brain'
 import { localRun } from './localSim'
 import { chaseVariant } from './scenarios'
@@ -54,6 +54,18 @@ describe('анатомия против контура', () => {
     expect(lit).toBeGreaterThan(0)
     const w = getW()
     expect(linkWeight(LINKS.find((l) => l.to === 'решение')!, w)).toBeGreaterThanOrEqual(0)
+  })
+
+  it('честность популяций: рисуем не больше клеток, чем в живом мозге', () => {
+    for (const r of REGIONS) {
+      expect(r.n, r.name).toBeGreaterThan(0)
+      expect(r.n, `нарисовано против реальности: ${r.name}`).toBeLessThanOrEqual(r.real)
+    }
+    // картина обязана быть густой: иначе вкладка выглядит набором точек, а не мозгом
+    expect(DRAWN_NEURONS).toBeGreaterThan(10000)
+    // и честной по сумме: реальный мозг заметно больше картинки
+    expect(REAL_NEURONS).toBeGreaterThan(DRAWN_NEURONS)
+    expect(DRAWN_NEURONS).toBe(REGIONS.reduce((s, r) => s + r.n, 0))
   })
 
   it('камера гасит контур: на узком глазу светиться почти нечему', () => {

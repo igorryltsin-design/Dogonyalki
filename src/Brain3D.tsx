@@ -9,10 +9,18 @@ import type { BrainReadout } from './types'
  *  выученные веса обучаемого выхода. Ничего не анимируется «просто по
  *  таймеру»: потух глаз — погас и регион.
  *
- *  Кластер «решение» устроен особенно: в нём 24 нейрона — по одному на канал
- *  входа readout, и светится своим |весом| каждый его нейрон. Тренировка мухи
- *  меняет именно эти числа, поэтому на этом кластере обучение видно лучше
- *  всего: врождённая муха держит два тонких канала, натренированная — много. */
+ *  Популяции взяты из открытого коннектами мухи и обсуждены в anatomy.ts:
+ *  крупные ядра (медулла, ламина, сетчатка) рисуются реже, чем они есть, —
+ *  иначе десятки тысяч точек сливаются в белое пятно и вешают слабый
+ *  школьный ноутбук. Размер точки считается из объёма ядра и числа точек,
+ *  поэтому у каждого региона своя «клетка»: гигантское ядро дышит мелкой
+ *  пылью, а маленький детектор цели — заметными шариками.
+ *
+ *  Кластер «решение» устроен особенно: в нём по нейрону на каждый канал
+ *  входа readout (вернее по два — каналов 24, точек 48), и светится своим
+ *  |весом| каждый его нейрон. Тренировка мухи меняет именно эти числа,
+ *  поэтому на этом кластере обучение видно лучше всего: врождённая муха
+ *  держит два тонких канала, натренированная — много. */
 
 const BG = new THREE.Color(0x05090c)
 /** sRGB → линейное: буферы вершинных цветов рендерер читает как линейные */
@@ -56,29 +64,35 @@ const hash = (s: string) => s.split('').reduce((a, c) => (a * 31 + c.charCodeAt(
  *  половина нейронов висела бы в темноте без своей оболочки. */
 const mirrored = (name: string) => /ламина|медулла|лобула|T4|T5|LPLC2|LC11/.test(name)
 
-type Built = {
+/** Сколько места у региона и какой поэтому диаметр клетки: точка обязана
+ *  оставлять соседям воздух, иначе ядро превращается в сплошное пятно. */
+function cellSize(reg: (typeof REGIONS)[number]): number {
+  const vol = ((4 / 3) * Math.PI * reg.r[0] * reg.r[1] * reg.r[2]) / (mirrored(reg.name) ? 2 : 1) / reg.n
+  return Math.min(0.03, Math.max(0.006, 0.62 * Math.cbrt(vol)))
+}
+
+type Cloud = {
+  ri: number
   geom: THREE.BufferGeometry
   count: number
   ch: Int16Array
   /** 0 — активность канала, 1 — |вес| этого канала, 2 — команда поворота */
   mode: Uint8Array
-  regionOf: Int16Array
   gains: Float32Array
   base: Float32Array
+  points: THREE.Points
+  mat: THREE.PointsMaterial
 }
 
-function buildCloud(): Built {
-  const total = REGIONS.reduce((s, r) => s + r.n, 0)
-  const pos = new Float32Array(total * 3)
-  const base = new Float32Array(total * 3)
-  const ch = new Int16Array(total)
-  const mode = new Uint8Array(total)
-  const regionOf = new Int16Array(total)
-  const gains = new Float32Array(total)
-  let off = 0
-  REGIONS.forEach((reg, ri) => {
+function buildClouds(sprite: THREE.Texture): Cloud[] {
+  return REGIONS.map((reg, ri) => {
     const rng = mulberry32(hash(reg.name) + reg.n)
     const isMirrored = mirrored(reg.name)
+    const pos = new Float32Array(reg.n * 3)
+    const base = new Float32Array(reg.n * 3)
+    const ch = new Int16Array(reg.n)
+    const mode = new Uint8Array(reg.n)
+    const gains = new Float32Array(reg.n)
     for (let i = 0; i < reg.n; i += 1) {
       let vx = rng() * 2 - 1
       let vy = rng() * 2 - 1
@@ -86,7 +100,7 @@ function buildCloud(): Built {
       const len = Math.max(Math.hypot(vx, vy, vz), 1e-6)
       const rad = Math.cbrt(rng())
       const side = isMirrored && i % 2 === 1 ? -1 : 1
-      const j = (off + i) * 3
+      const j = i * 3
       pos[j] = reg.c[0] * side + (vx / len) * rad * reg.r[0]
       pos[j + 1] = reg.c[1] + (vy / len) * rad * reg.r[1]
       pos[j + 2] = reg.c[2] + (vz / len) * rad * reg.r[2]
@@ -94,24 +108,32 @@ function buildCloud(): Built {
       base[j + 1] = s2l(reg.col[1])
       base[j + 2] = s2l(reg.col[2])
       if (reg.name === 'решение') {
-        mode[off + i] = 1
-        ch[off + i] = i % 24
+        mode[i] = 1
+        ch[i] = i % 24
       } else if (reg.name === 'крылья') {
-        mode[off + i] = 2
-        ch[off + i] = i % 2
+        mode[i] = 2
+        ch[i] = i % 2
       } else {
-        mode[off + i] = 0
-        ch[off + i] = reg.cols.length ? reg.cols[i % reg.cols.length] : 0
+        mode[i] = 0
+        ch[i] = reg.cols.length ? reg.cols[i % reg.cols.length] : 0
       }
-      regionOf[off + i] = ri
-      gains[off + i] = 0.5 + 0.5 * rng()
+      gains[i] = 0.5 + 0.5 * rng()
     }
-    off += reg.n
+    const geom = new THREE.BufferGeometry()
+    geom.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    geom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(reg.n * 3), 3).setUsage(THREE.DynamicDrawUsage))
+    const mat = new THREE.PointsMaterial({
+      size: cellSize(reg),
+      map: sprite,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+    const points = new THREE.Points(geom, mat)
+    return { ri, geom, count: reg.n, ch, mode, gains, base, points, mat }
   })
-  const geom = new THREE.BufferGeometry()
-  geom.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-  geom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(total * 3), 3).setUsage(THREE.DynamicDrawUsage))
-  return { geom, count: total, ch, mode, regionOf, gains, base }
 }
 
 export type Brain3DProps = {
@@ -142,24 +164,36 @@ export function Brain3D({ brain, weights, hover, onHover }: Brain3DProps) {
     const scene = new THREE.Scene()
     scene.background = BG.clone()
     const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 50)
-    camera.position.set(0, 0.45, 1.9)
+    // взгляд чуть сбоку и сверху, центр тяжести кадра — середина мозга: иначе
+    // сетчатка, ближайшая к камере, разрастается до половины экрана и
+    // закрывает собой все остальные ядра
+    const TARGET = new THREE.Vector3(0.05, 0.0, 0.25)
+    /** мозг в ширину занимает примерно ±0.8 условной единицы — это самые
+     *  боковые оболочки вместе с их рёбрами. Стартовую дальность считаем из
+     *  отношения сторон: на узком вертикальном экране телефона горизонтальный
+     *  угол зрения обрезает половину ядер, а один и тот же «1.95» на всех
+     *  экранах либо резал картинку, либо сжимал её в мелкое пятно. */
+    const HALF_W = 0.82
+    const fitDist = (aspect: number) => {
+      const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * Math.max(aspect, 0.3)
+      return THREE.MathUtils.clamp(HALF_W / tanHalf, 2, 4)
+    }
+    const dir0 = new THREE.Vector3(0.85, 0.75, 1.95).sub(TARGET).normalize()
+    camera.position.copy(TARGET).addScaledVector(dir0, 2.02)
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
 
     const controls = new OrbitControls(camera, canvas)
+    controls.target.copy(TARGET)
     controls.enableDamping = true
     controls.dampingFactor = 0.12
-    controls.minDistance = 0.7
+    controls.minDistance = 0.5
     controls.maxDistance = 4
     controls.enablePan = false
 
-    const built = buildCloud()
     const sprite = makeSprite()
-    const points = new THREE.Points(
-      built.geom,
-      new THREE.PointsMaterial({ size: 0.026, map: sprite, vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }),
-    )
-    scene.add(points)
+    const clouds = buildClouds(sprite)
+    clouds.forEach((c) => scene.add(c.points))
 
     // контуры регионов — полупрозрачные оболочки, чтобы зона читалась целиком;
     // у зеркальных регионов оболочек две — по одной на полголову
@@ -180,7 +214,15 @@ export function Brain3D({ brain, weights, hover, onHover }: Brain3DProps) {
         }),
       )
       mesh.position.set(reg.c[0] * side, reg.c[1], reg.c[2])
-      mesh.scale.set(reg.r[0] * 1.25, reg.r[1] * 1.25, reg.r[2] * 1.25)
+      // оболочка едва заметно больше самого облака: она должна намечать границy
+      // зоны, а не превращать мозг в кашу из пересекающихся пузырей
+      mesh.scale.set(reg.r[0] * 1.06, reg.r[1] * 1.06, reg.r[2] * 1.06)
+      // пузыри рисуются раньше нейронов: иначе полупрозрачная оболочка
+      // натягивается поверх уже светящихся клеток и гасит их
+      mesh.renderOrder = -1
+      // номер региона прячем в userData: по нему наведение и называет зону,
+      // не перебирая массив оболочек
+      mesh.userData.ri = ri
       scene.add(mesh)
       return mesh
     })
@@ -206,25 +248,35 @@ export function Brain3D({ brain, weights, hover, onHover }: Brain3DProps) {
     const PULSE_PER_LINK = 3
     const pulseGeom = new THREE.BufferGeometry()
     pulseGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(LINKS.length * PULSE_PER_LINK * 3), 3))
-    const pulses = new THREE.Points(
-      pulseGeom,
-      new THREE.PointsMaterial({ size: 0.05, map: sprite, color: new THREE.Color(0.9, 0.95, 1), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }),
-    )
+    const pulseMat = new THREE.PointsMaterial({
+      size: 0.05,
+      map: sprite,
+      color: new THREE.Color(0.9, 0.95, 1),
+      transparent: true,
+      opacity: 0.5,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+    const pulses = new THREE.Points(pulseGeom, pulseMat)
     scene.add(pulses)
 
+    // наведение курсора — по оболочкам, а не по точкам: перебирать одиннадцать
+    // тысяч точек на каждое движение мыши нельзя, а зона всё равно называется
+    // целиком, не отдельной клеткой
     const ray = new THREE.Raycaster()
-    ray.params.Points.threshold = 0.035
     const ndc = new THREE.Vector2()
     function onMove(ev: PointerEvent) {
       const rect = canvas!.getBoundingClientRect()
       ndc.set(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1)
       ray.setFromCamera(ndc, camera)
-      const hit = ray.intersectObject(points)[0]
-      const i = hit?.index
-      onHover(i === undefined ? null : REGIONS[built.regionOf[i]].name)
+      const hit = ray.intersectObjects(shells, false)[0]
+      onHover(hit ? REGIONS[(hit.object.userData as { ri?: number }).ri ?? 0].name : null)
     }
     canvas.addEventListener('pointermove', onMove)
 
+    // дальность, которую выбрала себе автокамера; пока ребёнок не крутил
+    // колесо, при каждом изменении кадра пересчитываем её под новые стороны
+    let autoDist = 0
     const resize = () => {
       const w = wrap.clientWidth
       const h = wrap.clientHeight
@@ -232,6 +284,16 @@ export function Brain3D({ brain, weights, hover, onHover }: Brain3DProps) {
       renderer.setSize(w, h, false)
       camera.aspect = w / h
       camera.updateProjectionMatrix()
+      const d = camera.position.distanceTo(controls.target)
+      if (!autoDist || Math.abs(d - autoDist) < 0.06) {
+        autoDist = fitDist(w / h)
+        // направление считаем ДОЗДРАВО до того, как позиция переедет: иначе
+        // camera.position уже равен цели, вектор нулевой, и камера падает
+        // внутрь мозга — экран становится чёрным
+        const dir = camera.position.clone().sub(controls.target).normalize()
+        if (dir.lengthSq() < 1e-6) dir.copy(dir0)
+        camera.position.copy(controls.target).addScaledVector(dir, autoDist)
+      }
     }
     resize()
     const ro = new ResizeObserver(resize)
@@ -247,32 +309,34 @@ export function Brain3D({ brain, weights, hover, onHover }: Brain3DProps) {
       if (now - lastPaint > 40 || lastHover !== hov) {
         lastPaint = now
         lastHover = hov
-        const colors = built.geom.getAttribute('color') as THREE.BufferAttribute
-        const arr = colors.array as Float32Array
         const hovIdx = hov ? REGIONS.findIndex((r) => r.name === hov) : -1
-        for (let i = 0; i < built.count; i += 1) {
-          let v = 0
-          if (fr) {
-            const m = built.mode[i]
-            if (m === 0) v = channelValue(built.ch[i], fr)
-            else if (m === 1) v = Math.min(1, (Math.abs(w[0]?.[built.ch[i]] ?? 0) + Math.abs(w[1]?.[built.ch[i]] ?? 0)) / 2.2)
-            else v = Math.min(1, Math.abs(fr.out[built.ch[i]] ?? 0) * 1.4)
+        for (const cloud of clouds) {
+          const colors = cloud.geom.getAttribute('color') as THREE.BufferAttribute
+          const arr = colors.array as Float32Array
+          const focus = hovIdx >= 0 ? (cloud.ri === hovIdx ? 1.5 : 0.32) : 1
+          for (let i = 0; i < cloud.count; i += 1) {
+            let v = 0
+            if (fr) {
+              const m = cloud.mode[i]
+              if (m === 0) v = channelValue(cloud.ch[i], fr)
+              else if (m === 1) v = Math.min(1, (Math.abs(w[0]?.[cloud.ch[i]] ?? 0) + Math.abs(w[1]?.[cloud.ch[i]] ?? 0)) / 2.2)
+              else v = Math.min(1, Math.abs(fr.out[cloud.ch[i]] ?? 0) * 1.4)
+            }
+            const act = Math.min(1, v * cloud.gains[i])
+            const s = Math.min(1.3, (fr ? 0.1 : 0.16) + act * 0.95) * focus
+            const j = i * 3
+            arr[j] = cloud.base[j] * s
+            arr[j + 1] = cloud.base[j + 1] * s
+            arr[j + 2] = cloud.base[j + 2] * s
           }
-          const act = Math.min(1, v * built.gains[i])
-          const s = Math.min(1.3, (fr ? 0.1 : 0.16) + act * 0.95)
-          const hovK = hovIdx >= 0 ? (built.regionOf[i] === hovIdx ? 1.5 : 0.32) : 1
-          const j = i * 3
-          arr[j] = built.base[j] * s * hovK
-          arr[j + 1] = built.base[j + 1] * s * hovK
-          arr[j + 2] = built.base[j + 2] * s * hovK
+          colors.needsUpdate = true
         }
-        colors.needsUpdate = true
         shells.forEach((mesh, si) => {
           const ri = shellDefs[si].ri
           const mat = mesh.material as THREE.MeshBasicMaterial
           const e = regionActivity(REGIONS[ri].name, fr)
           const focus = hovIdx >= 0 ? (ri === hovIdx ? 1 : 0.25) : 1
-          mat.opacity = (0.035 + e * 0.1) * focus
+          mat.opacity = (0.018 + e * 0.05) * focus
         })
         const lc = linkColAttr.array as Float32Array
         LINKS.forEach((l, i) => {
@@ -316,7 +380,7 @@ export function Brain3D({ brain, weights, hover, onHover }: Brain3DProps) {
         }
       })
       pa.needsUpdate = true
-      ;(pulses.material as THREE.PointsMaterial).opacity = 0.12 + Math.min(1, sumE / LINKS.length) * 0.7
+      pulseMat.opacity = 0.12 + Math.min(1, sumE / LINKS.length) * 0.7
       controls.update()
       renderer.render(scene, camera)
       raf = requestAnimationFrame(tick)
@@ -328,15 +392,17 @@ export function Brain3D({ brain, weights, hover, onHover }: Brain3DProps) {
       ro.disconnect()
       canvas.removeEventListener('pointermove', onMove)
       controls.dispose()
-      built.geom.dispose()
+      clouds.forEach((c) => {
+        c.geom.dispose()
+        c.mat.dispose()
+      })
       linkGeom.dispose()
       pulseGeom.dispose()
       shells.forEach((m) => {
         m.geometry.dispose()
         ;(m.material as THREE.Material).dispose()
       })
-      ;(points.material as THREE.Material).dispose()
-      ;(pulses.material as THREE.Material).dispose()
+      pulseMat.dispose()
       linkMat.dispose()
       sprite.dispose()
       renderer.dispose()

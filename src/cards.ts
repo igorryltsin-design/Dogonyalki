@@ -48,7 +48,7 @@ export function episodeCards(sc: ChaseScenario, samplingStep = 6, maxPerEpisode 
   return out
 }
 
-/** Собрать датасет под глаз: ~episodes погонев, деление 4:1 по эпизодам. */
+/** Собрать датасет под глаз: несколько погонь, деление 4:1 по эпизодам. */
 export async function collectCards(
   eye: EyeConfig,
   episodes = 24,

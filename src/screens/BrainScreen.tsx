@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { localRun } from '../localSim'
 import { chaseVariant } from '../scenarios'
 import { getW, innateW } from '../brain'
 import { flyIsInnate, resetFly, trainFly } from '../trainLocal'
-import { CHANNELS, REGIONS, regionActivity } from '../anatomy'
+import { CHANNELS, DRAWN_NEURONS, REAL_NEURONS, REGIONS, regionActivity } from '../anatomy'
 import { Brain3D } from '../Brain3D'
 import { Stat } from '../ui-kid/Stat'
 import type { EyeConfig, GameFrame } from '../types'
@@ -12,9 +12,11 @@ import type { EyeConfig, GameFrame } from '../types'
  *  погоня с пилотом-мухою, поэтому яркость региона = что контур в этот миг
  *  действительно считает, а толщина путей к «решению» = выученные веса.
  *  Переключи глаз на камеру — и почти всё погаснет: цели перестают быть в
- *  поле, считать нечего. */
-
-const NEURONS = REGIONS.reduce((s, r) => s + r.n, 0)
+ *  поле, считать нечего.
+ *
+ *  Каркас тот же, что у Арены: сцена растягивается на всю ширину и высоту
+ *  окна, а подписи наплывают на неё справа на большом экране и уезжают под
+ *  неё на телефоне — иначе на 390 пикселях панель съела бы весь мозг. */
 
 export function BrainScreen({ eye }: { eye: EyeConfig }) {
   const [fr, setFr] = useState<GameFrame | null>(null)
@@ -47,7 +49,7 @@ export function BrainScreen({ eye }: { eye: EyeConfig }) {
   }, [eye])
 
   const w = getW()
-  const innate = useMemo(() => innateW(), [])
+  const innate = innateW()
   const sumW = w.reduce((s, row) => s + row.reduce((a, v) => a + Math.abs(v), 0), 0)
   // полоска весов нормирована по самому сильному весу и по корню: выученные
   // каналы отличаются в разы (1.4 против 0.05), а линейная шкала оставляла бы
@@ -74,17 +76,31 @@ export function BrainScreen({ eye }: { eye: EyeConfig }) {
 
   return (
     <div className="page">
-      <div className="row">
-        <div className="card" style={{ flex: 5, minWidth: 360 }}>
-          <h2>Мозг Огонька</h2>
+      <div className="stage-wrap">
+        <div className="stage">
           <Brain3D brain={fr?.brain} weights={w} hover={hover} onHover={setHover} />
-          <p className="hint" style={{ marginTop: 10 }}>
-            Тащи мышью, чтобы повернуть; колесо — приблизить. Наведи курсор на область —
-            расскажу, что она делает. Свет = сколько в этот миг считает контур, толщина
-            путей к «решению» = выученные веса.
-          </p>
         </div>
-        <div className="card" style={{ flex: 4, minWidth: 320 }}>
+
+        <div className="overlay overlay--tl brain-controls">
+          <div className="progress"><i style={{ width: `${Math.round(progress * 100)}%` }} /></div>
+          <div className="hud-line">
+            <button className="big big--sm" disabled={busy} onClick={teach}>
+              {busy ? 'Учусь…' : 'Тренировать муху'}
+            </button>
+            <button
+              className="big big--ghost big--sm"
+              disabled={busy || flyIsInnate()}
+              onClick={() => {
+                resetFly()
+                setFr(null)
+              }}
+            >
+              Сбросить в врождённый
+            </button>
+          </div>
+        </div>
+
+        <div className="overlay overlay--side">
           <h3>что светится сейчас</h3>
           <ul className="brain-legend">
             {REGIONS.map((r) => {
@@ -100,6 +116,7 @@ export function BrainScreen({ eye }: { eye: EyeConfig }) {
                   <b>{r.name}</b>
                   <span className="bar bar--act"><i style={{ width: `${Math.round(a * 100)}%` }} /></span>
                   <em>{Math.round(a * 100)}%</em>
+                  <small>{r.real.toLocaleString('ru-RU')}</small>
                 </li>
               )
             })}
@@ -135,33 +152,25 @@ export function BrainScreen({ eye }: { eye: EyeConfig }) {
           </p>
 
           <div className="stats">
-            <Stat label="нейронов в мозге" value={String(NEURONS)} />
-            <Stat label="сумма весов" value={sumW.toFixed(2)} />
-            <Stat label="каналов стало важнее" value={`${stronger} из ${CHANNELS}`} bad={stronger === 0} />
+            <Stat label="клеток на картинке" value={DRAWN_NEURONS.toLocaleString('ru-RU')} small />
+            <Stat label="нейронов у мухи" value={`≈ ${REAL_NEURONS.toLocaleString('ru-RU')}`} small />
+            <Stat label="сумма весов" value={sumW.toFixed(2)} small />
+            <Stat label="каналов стало важнее" value={`${stronger} из ${CHANNELS}`} bad={stronger === 0} small />
           </div>
 
-          <div className="progress"><i style={{ width: `${Math.round(progress * 100)}%` }} /></div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button className="big" disabled={busy} onClick={teach}>
-              {busy ? 'Учусь…' : 'Тренировать муху'}
-            </button>
-            <button
-              className="big big--ghost"
-              disabled={busy || flyIsInnate()}
-              onClick={() => {
-                resetFly()
-                setFr(null)
-              }}
-            >
-              Сбросить в врождённый
-            </button>
-          </div>
           <p className="hint" style={{ marginTop: 10 }}>
             После тренировки смотри на «решение»: оно разгорается, а пути к нему
             толстеют — это те же числа, что двигают Огонька на арене.
           </p>
         </div>
       </div>
+
+      <p className="hint">
+        Тащи мышью или пальцем, чтобы повернуть мозг; колесо или щипок — приблизить. Свет =
+        сколько в этот миг считает контур, толщина путей к «решению» = выученные веса. Число
+        справа в списке — сколько таких клеток у живой мухи; гигантские ядра рисуем реже, чем
+        они есть, иначе картинка слилась бы в сплошное пятно.
+      </p>
     </div>
   )
 }

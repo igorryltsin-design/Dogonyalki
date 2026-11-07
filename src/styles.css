@@ -28,36 +28,39 @@ body {
 }
 
 .app {
-  min-height: 100%;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
 
 /* ── шапка: название + вкладки + глаз ─────────────────────────────── */
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
-  padding: 12px 20px;
+  padding: 10px clamp(8px, 2vw, 20px);
   background: var(--card);
   border-bottom: 2px solid var(--line);
   box-shadow: var(--shadow);
 }
 .topbar__title {
-  font-size: 24px;
+  font-size: clamp(20px, 3.4vw, 26px);
   font-weight: 800;
   color: var(--green-deep);
-  margin: 0 8px 0 0;
+  margin: 0 4px 0 0;
 }
-.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .tabs button {
   border: 2px solid var(--line);
   background: var(--card);
   color: var(--ink);
-  padding: 10px 18px;
+  padding: 8px clamp(10px, 1.6vw, 18px);
   border-radius: 14px;
-  font-size: 18px;
+  font-size: clamp(15px, 2.2vw, 18px);
   font-weight: 700;
   cursor: pointer;
 }
@@ -96,28 +99,64 @@ body {
 .eyebar input[type='range'] { width: 120px; accent-color: var(--amber); }
 
 /* ── содержимое ───────────────────────────────────────────────────── */
+/* Максимальной ширины больше нет: на мониторе 27" игра сжималась в узкую
+   колонку посередине, а сцена — главное, что ребёнок разглядывает, —
+   оставалась лоскутком. Страница идёт во всю ширину, сцена во всю высоту,
+   которую позволяет окно. */
 .page {
   flex: 1;
   width: 100%;
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 18px clamp(12px, 3vw, 28px) 40px;
+  padding: 12px clamp(8px, 1.6vw, 20px) 28px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
-.row { display: flex; gap: 16px; flex-wrap: wrap; align-items: stretch; }
+.row { display: flex; gap: 14px; flex-wrap: wrap; align-items: stretch; }
 .card {
   background: var(--card);
   border: 2px solid var(--line);
   border-radius: 18px;
   box-shadow: var(--shadow);
-  padding: 16px;
+  padding: 14px clamp(10px, 1.6vw, 18px);
 }
 .card h2, .card h3 { margin: 0 0 10px; color: var(--green-deep); }
-.card h2 { font-size: 22px; }
-.card h3 { font-size: 18px; }
-.hint { color: var(--ink-soft); font-size: 16px; }
+.card h2 { font-size: clamp(19px, 2.6vw, 24px); }
+.card h3 { font-size: clamp(16px, 2.2vw, 19px); }
+.hint { color: var(--ink-soft); font-size: clamp(14px, 1.9vw, 16px); }
+
+/* ── сцена: арена и мозг занимают весь экран ──────────────────────── */
+/* Обёртка держит сцену и наплывные панели соседями, а не вложенными: на
+   телефоне панель перестаёт быть наплывной и уезжает под сцену, где ей и
+   место — поверх картинки помещать кнопки на узком экране нельзя. */
+.stage-wrap { position: relative; display: flex; flex-direction: column; gap: 12px; }
+.stage {
+  position: relative;
+  width: 100%;
+  height: clamp(340px, 70dvh, 1200px);
+  border-radius: 18px;
+  overflow: hidden;
+  border: 2px solid var(--line);
+  box-shadow: var(--shadow);
+  background: #05090c;
+}
+.stage > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.overlay {
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 10px 12px;
+}
+@media (min-width: 901px) {
+  .overlay { position: absolute; z-index: 5; }
+  .overlay--tl { left: 16px; top: 16px; max-width: min(560px, 60%); }
+  .overlay--tr { right: 16px; top: 16px; }
+  .overlay--side { right: 16px; top: 16px; bottom: 16px; width: min(390px, 38%); overflow: auto; }
+}
+
+/* панель управления мозгом: на большом экране — уголок над сценой, поэтому
+  width держим узкой, чтобы она не легла на сами ядра */
+.brain-controls { max-width: 320px; }
 
 /* крупные кнопки */
 .big {
@@ -163,31 +202,41 @@ body {
 .chips button.is-on { background: var(--green); color: #fff; border-color: var(--green-deep); }
 .chips button:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* арена: canvas растягивается по ширине карточки, высота — от ширины
-   (пропорция 16:9), а не жёсткий десяток пикселей, потому что на большом
-   экране арена обязана быть большой */
-.arena-wrap {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  min-height: 260px;
-}
-/* на узком экране (ноутбук, планшет, проектор в углу) арена становится
-   квадратнее: выше запас под боковой манёвр, и карточка глаза уходит вниз */
-@media (max-width: 1000px) {
-  .arena-wrap { aspect-ratio: 4 / 3; }
-  .row { flex-direction: column; }
-}
-canvas.arena {
+/* арена: сцена живёт в .stage, здесь только то, что отличает её фон,
+   врезка глаза поверх неё и компактный HUD */
+canvas.arena { background: linear-gradient(#dff0fb 0%, #eaf6e2 78%, #cfe8c2 100%); }
+.eye-inset { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.eye-inset .cap { font-size: 14px; color: var(--ink-soft); font-weight: 700; }
+.hud-line { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+/* цифры погони живут ПОД сценой, а не на ней: на телефоне наплывная панель
+   закрыла бы половину погони, а ряд под картинкой умещается всегда */
+.hud-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+/* итог одной погони: крупная подпись поверх сцены. Плашка живёт ВНУТРИ
+   .stage и прижата к её нижнему краю: сверху там панели управления, а
+   процент от высоты обёртки ронял бы её на бойцов */
+.flash {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  border-radius: 16px;
-  border: 2px solid var(--line);
-  background: linear-gradient(#dff0fb 0%, #eaf6e2 78%, #cfe8c2 100%);
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 8px 22px;
+  border-radius: 999px;
+  font-size: clamp(20px, 4vw, 34px);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #fff;
+  box-shadow: var(--shadow);
+  pointer-events: none;
 }
+.flash--hit { background: var(--green-deep); }
+.flash--miss { background: #a33b22; }
+/* кнопки и цифры поверх сцены обязаны быть мельче, чем в карточке, иначе
+   на ноутбуке панель съедает половину погони */
+.big--sm { padding: 10px 18px; font-size: 17px; border-radius: 13px; }
+.stat--sm { min-width: 92px; padding: 6px 10px; }
+.stat--sm b { font-size: 21px; }
+.stat--sm span { font-size: 13px; }
 canvas.viewport--seeker {
   width: 220px;
   height: 220px;
@@ -205,21 +254,15 @@ canvas.viewport--seeker {
 .progress i { display: block; height: 100%; background: var(--green); transition: width 0.2s; }
 
 /* ── вкладка «Мозг»: трёхмерный контур Огонька ─────────────────────── */
-/* высота задана явно, а не пропорцией: квадрат по ширине карточки на широком
-   мониторе уехал бы за нижний край экрана, и кнопок тренировки не было бы видно */
-.brain-wrap {
-  position: relative;
-  width: 100%;
-  height: clamp(320px, 52vh, 560px);
-}
+/* обёртка растягивается на весь .stage — размер задаёт экран, а не компонент,
+   чтобы сцена одинаково росла и на мониторе, и на телефоне */
+.brain-wrap { position: absolute; inset: 0; }
 canvas.brain {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   display: block;
-  border-radius: 16px;
-  border: 2px solid var(--line);
   background: #05090c;
   cursor: grab;
   touch-action: none;
@@ -236,9 +279,9 @@ canvas.brain {
 .brain-legend { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .brain-legend li {
   display: grid;
-  grid-template-columns: 14px 92px 1fr 46px;
+  grid-template-columns: 14px 92px 1fr 46px 54px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 4px 6px;
   border-radius: 10px;
   cursor: pointer;
@@ -247,6 +290,8 @@ canvas.brain {
 .brain-legend li > i { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); }
 .brain-legend b { font-size: 16px; font-weight: 700; }
 .brain-legend em { font-style: normal; font-size: 14px; color: var(--ink-soft); text-align: right; }
+/* настоящее число клеток по коннектому — подпись справа от процента */
+.brain-legend small { font-size: 13px; color: var(--ink-soft); text-align: right; }
 /* полоска активности — тот же .bar, но здесь это желобок, а не столбик доски */
 .bar--act { height: 12px; border-radius: 7px; background: #e6e3d6; overflow: hidden; }
 .bar--act i { display: block; height: 100%; border-radius: 7px; background: var(--blue); }
@@ -285,3 +330,64 @@ table.board td:last-child { border-radius: 0 12px 12px 0; }
 
 .event-log { font-size: 15px; color: var(--ink-soft); max-height: 84px; overflow-y: auto; }
 .footer { padding: 10px 20px 24px; text-align: center; color: var(--ink-soft); font-size: 13px; }
+
+/* ── телефон: всё, что выше, перебиваем здесь ──────────────────────── */
+/* этот блок живёт в самом конце файла: мобильные правила спорят с
+   базовыми (.chips, .big--sm, .stage определены ниже по файлу), а при равной
+   силе побеждает то, что написано последним. */
+@media (max-width: 900px) {
+  .page { padding: 8px 8px 22px; gap: 8px; }
+  /* Телефон: шапка съедала четверть экрана. Заголовок и вкладки — одной
+     строкой, ручка глаза переезжает на вторую во всю ширину. */
+  .topbar { padding: 6px 8px; gap: 8px; flex-wrap: nowrap; }
+  .topbar__title { font-size: 16px; flex: none; }
+  /* вкладки — тоже одной строкой; если шрифт на машине крупнее, чем мы
+     посчитали, строка смахивается пальцем, а не переносится и не лезет */
+  .tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .tabs button { padding: 6px 10px; font-size: 14px; border-radius: 12px; flex: none; }
+  .eyebar { width: 100%; margin-left: 0; padding: 6px 8px; gap: 10px; }
+  .eyebar__seg button { padding: 6px 10px; font-size: 14px; }
+  .eyebar label { font-size: 13px; gap: 6px; }
+  /* на телефоне слово «помехи» короткое: «в глазу» из него выпадает, иначе
+     строка переносится и шапка съедает ещё одну высоту */
+  .eyebar__cap-long { display: none; }
+  .eyebar input[type='range'] { width: 62px; }
+  /* Ребёнок жмёт «Пуск», не прокручивая страницу: панель управления уезжает
+     наверх, над сценой, а сцена занимает остаток экрана. */
+  .stage-wrap .overlay--tl { order: -1; }
+  .stage { height: clamp(280px, 50dvh, 620px); }
+  .overlay { padding: 10px; }
+  /* пилоты на телефоне — одна строка, которую можно смахнуть пальцем: три
+     чипа в столбик поднимали панель на 120 пикселей и прятали погоню */
+  .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .chips button { font-size: 14px; padding: 6px 12px; flex: none; }
+  .hud-line { gap: 6px; }
+  /* Кадр глаза — главный учебный объект, его прятать под сцену нельзя:
+     на телефоне он лежит уголком на самой сцене (120 пикселей решётку читают,
+     а погоня от уголка не страдает) и потому не съедает высоту страницы. */
+  .stage-wrap .overlay--tr {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    z-index: 5;
+    padding: 6px 8px;
+    background: rgba(255, 255, 255, 0.86);
+  }
+  .overlay--tr .cap { font-size: 11px; }
+  /* итог погони на телефоне — сверху сцены: внизу уже лежит кадр глаза, и
+     на узком экране две плашки в одной полоске обязательно полезли бы друг
+     на друга */
+  .flash { top: 10px; bottom: auto; font-size: clamp(18px, 5vw, 26px); padding: 6px 18px; }
+
+  .row { flex-direction: column; }
+  canvas.viewport--seeker { width: min(220px, 60vw); height: min(220px, 60vw); }
+  /* цифры погони — одной строкой, иначе ряд из четырёх плиток складывается в
+     две и уползает за край экрана. Полоска времени уезжает над ними тонкой
+     линией: она нужна на «Пуск ×10», но свои 220 пикселей в строке она
+     выламывала перенос. */
+  .hud-row { gap: 6px; }
+  .hud-row .progress { flex: 1 1 100%; order: -1; margin: 0; height: 10px; }
+  .stat--sm { min-width: 70px; padding: 4px 7px; }
+  .stat--sm b { font-size: 17px; }
+  .stat--sm span { font-size: 11px; }
+}
