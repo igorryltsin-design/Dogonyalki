@@ -7,13 +7,18 @@ import { loadCards } from '../cards'
 import { SeekerView } from '../SeekerView'
 import { Stat } from '../ui-kid/Stat'
 import { Arena3D } from '../Arena3D'
+import { drawPursuit, emptyTrail, stepTrail, type Trail } from '../topdown'
 
 /** Экран «Арена»: погоня Огонька за Шустриком. Два вида одного и того же
  *  погоня — объём (три модели, камера летит за парой) и сверху (плоская
  *  схема: оба бегут вправо, вертикаль экрана = вбок). Вид переключается
  *  кнопкой и запоминается; движку всё равно, его кадры только показывают.
  *  «Пуск ×1» — одна погоня вживую, «Пуск ×10» — честная серия из десяти
- *  одинаковых погонь (те же сценарии, что на доске). */
+ *  одинаковых погонь (те же сценарии, что на доске).
+ *
+ *  Кнопка «ночь» меняет только показ: звёзды, луна и светящиеся трассы в
+ *  объёме, тёмный луг с теми же приметами — в плоском виде. Движок про ночь
+ *  не знает и знать не должен. */
 
 const PILOT_CAP: Record<Pilot, string> = {
   fly: 'Огонёк (муха)',
@@ -52,11 +57,18 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
     return webglWorks()
   })
   const [vw, setVw] = useState(() => (typeof window === 'undefined' ? 1200 : window.innerWidth))
+  const [night, setNight] = useState(() => {
+    try {
+      return typeof localStorage !== 'undefined' && localStorage.getItem('dogonjalki-sky') === 'night'
+    } catch {
+      return false
+    }
+  })
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef(0)
   const lastFrameRef = useRef<GameFrame | null>(null)
   const frameSink = useRef<((fr: GameFrame | null) => void) | null>(null)
-  const trailsRef = useRef<{ mx: number[]; my: number[]; tx: number[]; ty: number[] }>({ mx: [], my: [], tx: [], ty: [] })
+  const trailRef = useRef<Trail>(emptyTrail())
 
   const net = loadNet()
   const cards = loadCards(eye)
@@ -87,10 +99,25 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pilot, view3d])
 
-  /** Куда отдать кадр: в объём или на плоскую схему. */
+  /** Куда отдать кадр: в объём или на плоскую схему. Трасса нужна только
+   *  плоской схеме — в объёме её ведёт сама сцена. */
   function show(fr: GameFrame | null) {
-    if (view3d) frameSink.current?.(fr)
-    else draw(fr)
+    if (view3d) {
+      frameSink.current?.(fr)
+    } else if (fr) {
+      stepTrail(trailRef.current, fr)
+      draw(fr)
+    }
+  }
+
+  /** Вид сверху: вся геометрия картинки живёт в ../topdown.ts, потому что тот
+   *  же самый погон показывает экран «Мозг» — две версии одной схемы разъехались
+   *  бы по масштабу, и ребёнок сверял бы их между собой. */
+  function draw(fr: GameFrame | null) {
+    const canvas = canvasRef.current
+    if (!canvas || !fr) return
+    lastFrameRef.current = fr
+    drawPursuit(canvas, fr, { color: PILOT_COLOR[pilot], trail: trailRef.current, night })
   }
 
   /** Пока никто не бежал, показываем стойку на старте: поле не пустое. */
@@ -108,74 +135,6 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
     return net ? predictAzEl(net, img, eye) : { az: 0, el: 0 }
   }
 
-  /** Вид сверху: метры в пиксели. Камера следует за серединой пары, масштаб
-   *  считается отдельно по ширине и высоте: и весь погон в кадре, и как можно
-   *  крупнее. Прежние «30 метров в min(ширина, высота)» жал картинку в
-   *  центр, а боковой манёвр уводил Огонька за край поля. */
-  function draw(fr: GameFrame | null) {
-    const canvas = canvasRef.current
-    if (!canvas || !fr) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-    const dpr = Math.min(2, window.devicePixelRatio || 1)
-    const w = canvas.clientWidth
-    const h = canvas.clientHeight
-    if (!w || !h) return
-    lastFrameRef.current = fr
-    if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
-      canvas.width = Math.floor(w * dpr)
-      canvas.height = Math.floor(h * dpr)
-    }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, w, h)
-    const cx = (fr.chaser[0] + fr.runner[0]) / 2
-    const cy = (fr.chaser[1] + fr.runner[1]) / 2
-    // сколько метров влево-вправо и вверх-вниз от центра пары должно влезть
-    const halfX = Math.max(9, fr.range_m * 0.72)
-    const halfY = Math.max(5.5, Math.abs(fr.runner[1] - fr.chaser[1]) * 0.9 + 3.5)
-    const k = Math.min(w / (2 * halfX), h / (2 * halfY))
-    const ox = w / 2 - cx * k
-    const oy = h / 2 + cy * k
-    const px = (p: number[]) => [ox + p[0] * k, oy - p[1] * k] as const
-    const dot = Math.max(7, Math.min(18, k * 0.45))
-    const tr = trailsRef.current
-    // трассы: Шустрик — тонкая серая, догоняющий — цвет пилота
-    const line = (xs: number[], ys: number[], color: string, wid: number) => {
-      if (xs.length < 2) return
-      ctx.strokeStyle = color
-      ctx.lineWidth = wid
-      ctx.beginPath()
-      xs.forEach((x, i) => {
-        const [sx, sy] = px([x, ys[i], 0])
-        if (i === 0) ctx.moveTo(sx, sy)
-        else ctx.lineTo(sx, sy)
-      })
-      ctx.stroke()
-    }
-    line(tr.tx, tr.ty, 'rgba(120,110,100,0.5)', 3)
-    line(tr.mx, tr.my, PILOT_COLOR[pilot] + '88', 3)
-    // Шустрик — красный кружок с «косичкой»-хвостом
-    const [rx, ry] = px(fr.runner)
-    ctx.fillStyle = '#d95a3d'
-    ctx.beginPath()
-    ctx.arc(rx, ry, dot, 0, Math.PI * 2)
-    ctx.fill()
-    // Огонёк / сеть / читер — зелёный (синий, жёлтый) кружок + стрелка взгляда
-    const [mx, my] = px(fr.chaser)
-    ctx.fillStyle = PILOT_COLOR[pilot]
-    ctx.beginPath()
-    ctx.arc(mx, my, dot, 0, Math.PI * 2)
-    ctx.fill()
-    const a = Math.atan2(fr.look_el, fr.look_az)
-    ctx.strokeStyle = '#23301f'
-    ctx.lineWidth = 2.5
-    ctx.beginPath()
-    ctx.moveTo(mx, my)
-    ctx.lineTo(mx + Math.cos(a) * dot * 3, my - Math.sin(a) * dot * 3)
-    ctx.stroke()
-    // итог погони рисует не canvas, а плашка .flash поверх сцены: в 3D-виде
-    // картинки нет, и текст должен быть один и тот же в обоих видах
-  }
 
   function startOne() {
     cancelAnimationFrame(rafRef.current)
@@ -183,7 +142,7 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
     setSeries(null)
     setProgress(0)
     setRunKey((k) => k + 1)
-    trailsRef.current = { mx: [], my: [], tx: [], ty: [] }
+    trailRef.current = emptyTrail()
     const sc = { ...DEFAULT_CHASE, eye, seed: runSeed }
     setRunSeed((s) => s + 1)
     const gen = localRun(sc, { pilot: pilot === 'kid' ? 'kid' : pilot, predict: pilot === 'kid' ? predict : undefined })
@@ -199,12 +158,6 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
       } else {
         last = nx.value
         const fr = last
-        const tr = trailsRef.current
-        if (i % 2 === 0) {
-          tr.mx.push(fr.chaser[0]); tr.my.push(fr.chaser[1])
-          tr.tx.push(fr.runner[0]); tr.ty.push(fr.runner[1])
-          if (tr.mx.length > 600) { tr.mx.shift(); tr.my.shift(); tr.tx.shift(); tr.ty.shift() }
-        }
         i += 1
         if (i % 4 === 0) {
           setHud({ t: fr.t, range: fr.range_m, err: fr.look_err_deg, event: fr.event })
@@ -250,10 +203,30 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
     } catch {
       /* приватный режим: запоминать некуда и не надо */
     }
+    // трассу ведёт только плоская схема, поэтому с видом она начинается заново
+    trailRef.current = emptyTrail()
     // новый вид должен сразу показать тот же миг погони
     if (next) frameSink.current?.(lastFrameRef.current)
     else draw(lastFrameRef.current)
   }
+
+  /** день ↔ ночь: показ, а не расчёт; выбор переживает перезапуск страницы */
+  function flipSky() {
+    const next = !night
+    setNight(next)
+    try {
+      localStorage.setItem('dogonjalki-sky', next ? 'night' : 'day')
+    } catch {
+      /* приватный режим: запоминать некуда и не надо */
+    }
+  }
+
+  // смена неба должна сразу перекрасить нарисованный кадр: в плоском виде
+  // картинки на экране нет, пока не придёт следующий кадр погони
+  useEffect(() => {
+    if (!view3d) draw(lastFrameRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [night, view3d])
 
   const banner =
     hud.event === 'догнал' || hud.event === 'промах' ? (
@@ -273,12 +246,13 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
             pilot={pilot}
             tagRadius={DEFAULT_CHASE.tag_radius_m}
             runKey={runKey}
+            night={night}
           >
             {banner}
           </Arena3D>
         ) : (
           <div className="stage">
-            <canvas className="arena" ref={canvasRef} />
+            <canvas className={night ? 'arena arena--night' : 'arena'} ref={canvasRef} />
             {banner}
           </div>
         )}
@@ -308,6 +282,9 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
             </button>
             <button className="big big--ghost big--sm" disabled={busy || !webglOk} onClick={flipView}>
               {view3d ? 'вид сверху' : 'вид в 3D'}
+            </button>
+            <button className="big big--ghost big--sm" disabled={busy} onClick={flipSky}>
+              {night ? 'день' : 'ночь'}
             </button>
           </div>
         </div>
@@ -345,8 +322,9 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
 
       <p className="hint">
         {view3d
-          ? 'Оба бегут вперёд, кольцо под Шустриком — как близко надо подойти, чтобы осалить. Тяните картинку мышью или пальцем — камера оглядывается. «Пуск ×10» — десять одинаковых погонь, как на доске.'
+          ? 'Оба бегут вперёд, кольцо под Шустриком — как близко надо подойти, чтобы осалить. Тяните картинку мышью или пальцем — камера оглядывается. Деревья и травинки стоят на месте: по ним видно, как быстро бежит погоня. «Пуск ×10» — десять одинаковых погонь, как на доске.'
           : 'Вид сверху: оба бегут вправо, вверх-вниз экрана — вбок. Стрелка показывает, куда догоняющий смотрит глазом. «Пуск ×10» — десять одинаковых погонь, как на доске.'}
+        {' '}Кнопка «ночь» меняет только картинку: луна, звёзды и светящиеся трассы — счёт остаётся тот же.
       </p>
     </div>
   )

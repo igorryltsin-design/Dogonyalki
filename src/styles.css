@@ -151,6 +151,7 @@ body {
   .overlay { position: absolute; z-index: 5; }
   .overlay--tl { left: 16px; top: 16px; max-width: min(560px, 60%); }
   .overlay--tr { right: 16px; top: 16px; }
+  .overlay--bl { left: 16px; bottom: 16px; }
   .overlay--side { right: 16px; top: 16px; bottom: 16px; width: min(390px, 38%); overflow: auto; }
 }
 
@@ -205,6 +206,22 @@ body {
 /* арена: сцена живёт в .stage, здесь только то, что отличает её фон,
    врезка глаза поверх неё и компактный HUD */
 canvas.arena { background: linear-gradient(#dff0fb 0%, #eaf6e2 78%, #cfe8c2 100%); }
+/* ночь в плоском виде: тот же луг, только под луной, — трассы и взгляд на
+   тёмном фоне должны светиться, а не темнеть вместе с полем */
+canvas.arena--night { background: linear-gradient(#0a1118 0%, #0f2129 70%, #16332c 100%); }
+/* живой вид сверху на вкладке «Мозг»: та же погоня, чьими кадрами зажигается
+   контур; масштаб картинки задаёт экран, а не содержимое панели */
+.pursuit-mini { display: flex; flex-direction: column; gap: 6px; max-width: 320px; }
+.pursuit-mini canvas {
+  width: min(300px, 46vw);
+  height: clamp(110px, 22dvh, 190px);
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: #eaf6e2;
+  display: block;
+}
+.pursuit-mini.is-night canvas { background: #0f2129; }
+.pursuit-mini .cap { font-size: 14px; color: var(--ink-soft); font-weight: 700; }
 .eye-inset { display: flex; flex-direction: column; gap: 6px; align-items: center; }
 .eye-inset .cap { font-size: 14px; color: var(--ink-soft); font-weight: 700; }
 .hud-line { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -355,6 +372,11 @@ table.board td:last-child { border-radius: 0 12px 12px 0; }
   /* Ребёнок жмёт «Пуск», не прокручивая страницу: панель управления уезжает
      наверх, над сценой, а сцена занимает остаток экрана. */
   .stage-wrap .overlay--tl { order: -1; }
+  /* погоня-подсказка на вкладке «Мозг» поднимается так же: под длинной
+     легендой регионов до неё никто не доедет, а смотреть надо рядом */
+  .stage-wrap .overlay--bl { order: -1; }
+  .pursuit-mini { max-width: none; }
+  .pursuit-mini canvas { width: 100%; height: 130px; }
   .stage { height: clamp(280px, 50dvh, 620px); }
   .overlay { padding: 10px; }
   /* пилоты на телефоне — одна строка, которую можно смахнуть пальцем: три

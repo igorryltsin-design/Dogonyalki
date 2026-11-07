@@ -6,6 +6,7 @@ import { flyIsInnate, resetFly, trainFly } from '../trainLocal'
 import { CHANNELS, DRAWN_NEURONS, REAL_NEURONS, REGIONS, regionActivity } from '../anatomy'
 import { Brain3D } from '../Brain3D'
 import { Stat } from '../ui-kid/Stat'
+import { drawPursuit, emptyTrail, stepTrail, type Trail } from '../topdown'
 import type { EyeConfig, GameFrame } from '../types'
 
 /** Экран «Мозг»: трёхмерный контур Огонька вживую. Поток кадров — настоящая
@@ -13,6 +14,11 @@ import type { EyeConfig, GameFrame } from '../types'
  *  действительно считает, а толщина путей к «решению» = выученные веса.
  *  Переключи глаз на камеру — и почти всё погаснет: цели перестают быть в
  *  поле, считать нечего.
+ *
+ *  Чтобы «вживую» не осталось абстракцией, в углу сцены лежит та самая погоня,
+ *  чьими кадрами контур зажигается: одна и та же последовательность Frame
+ *  показывает и схему в углу, и яркость ядер — они не могут разойтись по
+ *  времени.
  *
  *  Каркас тот же, что у Арены: сцена растягивается на всю ширину и высоту
  *  окна, а подписи наплывают на неё справа на большом экране и уезжают под
@@ -26,6 +32,8 @@ export function BrainScreen({ eye }: { eye: EyeConfig }) {
   const genRef = useRef<Generator<GameFrame> | null>(null)
   const seedRef = useRef(0)
   const stopRef = useRef(false)
+  const miniRef = useRef<HTMLCanvasElement>(null)
+  const trailRef = useRef<Trail>(emptyTrail())
 
   useEffect(() => {
     let raf = 0
@@ -47,6 +55,15 @@ export function BrainScreen({ eye }: { eye: EyeConfig }) {
       cancelAnimationFrame(raf)
     }
   }, [eye])
+
+  // Кадры этой же погони идут и в контур, и в схему в углу: трасса начинается
+  // заново, когда время потекло сначала, — то есть на каждом новом погоне
+  useEffect(() => {
+    const canvas = miniRef.current
+    if (!canvas || !fr) return
+    stepTrail(trailRef.current, fr)
+    drawPursuit(canvas, fr, { color: '#2e9e5b', trail: trailRef.current })
+  }, [fr])
 
   const w = getW()
   const innate = innateW()
@@ -98,6 +115,15 @@ export function BrainScreen({ eye }: { eye: EyeConfig }) {
               Сбросить в врождённый
             </button>
           </div>
+        </div>
+
+        <div className="overlay overlay--bl pursuit-mini">
+          <div className="cap">вот что сейчас происходит</div>
+          <canvas ref={miniRef} />
+          <p className="hint">
+            Стрелка — куда Огонёк смотрит глазом. Яркость ядер справа считается
+            по этим же кадрам, поэтому схема и контур никогда не расходятся.
+          </p>
         </div>
 
         <div className="overlay overlay--side">
