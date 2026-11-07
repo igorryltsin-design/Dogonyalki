@@ -14,7 +14,7 @@
 import { features, readout, sgd } from './brain'
 import { applyEyeNoise, decodeImage, eyeHalfFov, eyeImage } from './eye'
 import { makeRng } from './rng'
-import type { ChaseScenario, GameFrame, Pilot } from './types'
+import type { BrainReadout, ChaseScenario, GameFrame, Pilot } from './types'
 
 const G = 9.81
 
@@ -313,6 +313,7 @@ export function* localRun(sc: ChaseScenario, opts?: LocalRunOpts): Generator<Gam
     let aCmd: number[]
     let lookAz: number
     let lookEl: number
+    let brain: BrainReadout | undefined
     if (pilot === 'fly') {
       const gx = lock ? Math.tanh(azDot) : 0
       const gy = lock ? Math.tanh(elDot) : 0
@@ -330,6 +331,9 @@ export function* localRun(sc: ChaseScenario, opts?: LocalRunOpts): Generator<Gam
         sgd(readoutIn, [tPitch, tYaw], opts.lr ?? 0.03)
       }
       const { pitch, yaw } = readout(readoutIn)
+      // копии: состояния t4/t5/lc переставляются на следующем шаге, а кадр
+      // должен рассказать правду про тот миг, когда мозг ещё рулил
+      brain = { feat: [...feat], t4: [...t4], t5: [...t5], lc11: [...lc11], lc10: [...lc10], out: [pitch, yaw] }
       aCmd = clip(
         perp(
           add(
@@ -396,6 +400,7 @@ export function* localRun(sc: ChaseScenario, opts?: LocalRunOpts): Generator<Gam
       truth_el: truthEl,
       look_az: lookAz,
       look_el: lookEl,
+      brain,
       look_err_deg: errDeg,
       in_fov: inFov,
       event,

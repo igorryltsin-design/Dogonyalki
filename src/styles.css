@@ -204,6 +204,62 @@ canvas.viewport--seeker {
 .progress { height: 14px; border-radius: 8px; background: #e3e0d3; overflow: hidden; margin: 8px 0; }
 .progress i { display: block; height: 100%; background: var(--green); transition: width 0.2s; }
 
+/* ── вкладка «Мозг»: трёхмерный контур Огонька ─────────────────────── */
+/* высота задана явно, а не пропорцией: квадрат по ширине карточки на широком
+   мониторе уехал бы за нижний край экрана, и кнопок тренировки не было бы видно */
+.brain-wrap {
+  position: relative;
+  width: 100%;
+  height: clamp(320px, 52vh, 560px);
+}
+canvas.brain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 16px;
+  border: 2px solid var(--line);
+  background: #05090c;
+  cursor: grab;
+  touch-action: none;
+}
+.brain-note {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #b9d3c4;
+  font-size: 16px;
+}
+/* легенда регионов: чип цвета — название — полоска активности — процент */
+.brain-legend { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.brain-legend li {
+  display: grid;
+  grid-template-columns: 14px 92px 1fr 46px;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.brain-legend li.is-on { background: #eaf1f8; box-shadow: inset 0 0 0 2px var(--blue); }
+.brain-legend li > i { width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15); }
+.brain-legend b { font-size: 16px; font-weight: 700; }
+.brain-legend em { font-style: normal; font-size: 14px; color: var(--ink-soft); text-align: right; }
+/* полоска активности — тот же .bar, но здесь это желобок, а не столбик доски */
+.bar--act { height: 12px; border-radius: 7px; background: #e6e3d6; overflow: hidden; }
+.bar--act i { display: block; height: 100%; border-radius: 7px; background: var(--blue); }
+.brain-desc { min-height: 64px; margin: 0 0 10px; }
+
+/* тепловая полоса весов: 24 канала × 2 команды, ярче — сильнее вес,
+   янтарная рамка — канал развился именно от тренировки */
+.weights { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
+.weights__row { display: flex; align-items: center; gap: 3px; }
+.weights__cap { width: 74px; flex: none; font-size: 14px; font-weight: 700; color: var(--ink-soft); }
+.weights__row i { flex: 1 1 0; height: 20px; border-radius: 4px; background: var(--green-deep); }
+.weights__row i.is-grew { box-shadow: inset 0 0 0 2px var(--amber); }
+
 /* доска */
 table.board { border-collapse: separate; border-spacing: 0 8px; width: 100%; }
 table.board th { text-align: left; font-size: 15px; color: var(--ink-soft); padding: 4px 10px; }

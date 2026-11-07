@@ -3,17 +3,19 @@ import { EYE_FLY, type EyeConfig } from './types'
 import { EyeControl } from './ui-kid/EyeControl'
 import { ArenaScreen } from './screens/ArenaScreen'
 import { EyeScreen } from './screens/EyeScreen'
+import { BrainScreen } from './screens/BrainScreen'
 import { BoardScreen } from './screens/BoardScreen'
 
-/** Оболочка игры: три больших экрана + одна ручка глаза в шапке.
+/** Оболочка игры: четыре больших экрана + одна ручка глаза в шапке.
  *  Стейт глаза живёт здесь — переключатель виден на всех экранах сразу,
  *  и мухе, и сети школьника достаётся ровно тот же глаз. */
 
-type Screen = 'arena' | 'eye' | 'board'
+type Screen = 'arena' | 'eye' | 'brain' | 'board'
 
 const TABS: { key: Screen; name: string }[] = [
   { key: 'arena', name: 'Арена' },
   { key: 'eye', name: 'Глаз' },
+  { key: 'brain', name: 'Мозг' },
   { key: 'board', name: 'Доска' },
 ]
 
@@ -35,6 +37,7 @@ export function GameApp() {
       </header>
       {screen === 'arena' && <ArenaScreen eye={eye} />}
       {screen === 'eye' && <EyeScreen eye={eye} />}
+      {screen === 'brain' && <BrainScreen eye={eye} />}
       {screen === 'board' && <BoardScreen eye={eye} />}
       <footer className="footer">
         Учебная игра по материалам курса NNTrack · модель мозга мухи — FlyWire (CC BY-NC-SA 4.0) · без сервера и интернета

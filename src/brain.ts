@@ -72,6 +72,12 @@ export function getW() {
   return W
 }
 
+/** Врождённая проводка тем же шрифтом: чтобы на экране «Мозг» показать, что
+ *  именно изменила тренировка, не сбрасывая саму муху. */
+export function innateW() {
+  return defaultW()
+}
+
 export function features(
   az: number,
   el: number,
