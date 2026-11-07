@@ -35,6 +35,7 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
   const [progress, setProgress] = useState(0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef(0)
+  const lastFrameRef = useRef<GameFrame | null>(null)
   const trailsRef = useRef<{ mx: number[]; my: number[]; tx: number[]; ty: number[] }>({ mx: [], my: [], tx: [], ty: [] })
 
   const net = loadNet()
@@ -43,12 +44,37 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
 
   useEffect(() => () => cancelAnimationFrame(rafRef.current), [])
 
+  /** Арена растягивается вместе с окном: перерисовываем последний кадр, как
+   *  только меняются размеры canvas, — иначе картинка остаётся в старых пикселях. */
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => draw(lastFrameRef.current))
+    ro.observe(canvas)
+    return () => ro.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pilot])
+
+  /** Пока никто не бежал, показываем стойку на старте: поле не пустое. */
+  useEffect(() => {
+    const gen = localRun({ ...DEFAULT_CHASE, eye }, { pilot })
+    const first = gen.next()
+    if (!first.done) {
+      lastFrameRef.current = first.value
+      draw(first.value)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eye, pilot])
+
   function predict(img: number[][]) {
     return net ? predictAzEl(net, img, eye) : { az: 0, el: 0 }
   }
 
-  /** вид сверху: метры в пиксели, центр — середина дистанции старта */
-  function draw(fr: GameFrame | null, scale = 1) {
+  /** Вид сверху: метры в пиксели. Камера следует за серединой пары, масштаб
+   *  считается отдельно по ширине и высоте: и весь погон в кадре, и как можно
+   *  крупнее. Прежние «30 метров в min(ширина, высота)» жал картинку в
+   *  центр, а боковой манёвр уводил Огонька за край поля. */
+  function draw(fr: GameFrame | null) {
     const canvas = canvasRef.current
     if (!canvas || !fr) return
     const ctx = canvas.getContext('2d')
@@ -56,17 +82,24 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
     const dpr = Math.min(2, window.devicePixelRatio || 1)
     const w = canvas.clientWidth
     const h = canvas.clientHeight
-    if (canvas.width !== Math.floor(w * dpr)) {
+    if (!w || !h) return
+    lastFrameRef.current = fr
+    if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
       canvas.width = Math.floor(w * dpr)
       canvas.height = Math.floor(h * dpr)
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, w, h)
-    const span = Math.max(30, fr.range_m * 1.6)
-    const k = Math.min(w, h) / span
-    const ox = w / 2 - (fr.chaser[0] + fr.range_m * 0.4) * k
-    const oy = h / 2
+    const cx = (fr.chaser[0] + fr.runner[0]) / 2
+    const cy = (fr.chaser[1] + fr.runner[1]) / 2
+    // сколько метров влево-вправо и вверх-вниз от центра пары должно влезть
+    const halfX = Math.max(9, fr.range_m * 0.72)
+    const halfY = Math.max(5.5, Math.abs(fr.runner[1] - fr.chaser[1]) * 0.9 + 3.5)
+    const k = Math.min(w / (2 * halfX), h / (2 * halfY))
+    const ox = w / 2 - cx * k
+    const oy = h / 2 + cy * k
     const px = (p: number[]) => [ox + p[0] * k, oy - p[1] * k] as const
+    const dot = Math.max(7, Math.min(18, k * 0.45))
     const tr = trailsRef.current
     // трассы: Шустрик — тонкая серая, догоняющий — цвет пилота
     const line = (xs: number[], ys: number[], color: string, wid: number) => {
@@ -87,29 +120,27 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
     const [rx, ry] = px(fr.runner)
     ctx.fillStyle = '#d95a3d'
     ctx.beginPath()
-    ctx.arc(rx, ry, 9 * scale, 0, Math.PI * 2)
+    ctx.arc(rx, ry, dot, 0, Math.PI * 2)
     ctx.fill()
     // Огонёк / сеть / читер — зелёный (синий, жёлтый) кружок + стрелка взгляда
     const [mx, my] = px(fr.chaser)
     ctx.fillStyle = PILOT_COLOR[pilot]
     ctx.beginPath()
-    ctx.arc(mx, my, 9 * scale, 0, Math.PI * 2)
+    ctx.arc(mx, my, dot, 0, Math.PI * 2)
     ctx.fill()
     const a = Math.atan2(fr.look_el, fr.look_az)
     ctx.strokeStyle = '#23301f'
-    ctx.lineWidth = 2
+    ctx.lineWidth = 2.5
     ctx.beginPath()
     ctx.moveTo(mx, my)
-    ctx.lineTo(mx + Math.cos(a) * 26, my - Math.sin(a) * 26)
+    ctx.lineTo(mx + Math.cos(a) * dot * 3, my - Math.sin(a) * dot * 3)
     ctx.stroke()
-    if (fr.event === 'догнал') {
-      ctx.fillStyle = '#1c6e3f'
-      ctx.font = '700 26px sans-serif'
-      ctx.fillText('ДОГНАЛ!', w / 2 - 60, 40)
-    } else if (fr.event === 'промах') {
-      ctx.fillStyle = '#a33b22'
-      ctx.font = '700 26px sans-serif'
-      ctx.fillText('не догнал', w / 2 - 66, 40)
+    if (fr.event === 'догнал' || fr.event === 'промах') {
+      ctx.fillStyle = fr.event === 'догнал' ? '#1c6e3f' : '#a33b22'
+      ctx.font = `700 ${Math.round(Math.max(22, h * 0.09))}px sans-serif`
+      ctx.textAlign = 'center'
+      ctx.fillText(fr.event === 'догнал' ? 'ДОГНАЛ!' : 'не догнал', w / 2, h * 0.14)
+      ctx.textAlign = 'start'
     }
   }
 
