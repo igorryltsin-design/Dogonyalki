@@ -1,0 +1,25 @@
+{
+  "name": "dogonjalki",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Догонялки: муха против сети школьника — учебная браузерная игра",
+  "scripts": {
+    "dev": "vite --port 5173 --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "build:offline": "tsc --noEmit && vite build && node tools/inline.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.9"
+  }
+}

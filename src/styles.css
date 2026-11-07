@@ -1,0 +1,216 @@
+/* Детский интерфейс «Догонялок»: крупные кнопки, тёплые цвета, ничего мелкого. */
+
+:root {
+  --bg: #f4f1e8;
+  --card: #ffffff;
+  --ink: #23301f;
+  --ink-soft: #5d6b56;
+  --green: #2e9e5b;
+  --green-deep: #1c6e3f;
+  --blue: #3a7bd5;
+  --red: #d95a3d;
+  --amber: #e0a12a;
+  --line: #d9d3c2;
+  --shadow: 0 3px 14px rgba(40, 50, 30, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Trebuchet MS', 'Segoe UI', 'PT Sans', system-ui, sans-serif;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── шапка: название + вкладки + глаз ─────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  background: var(--card);
+  border-bottom: 2px solid var(--line);
+  box-shadow: var(--shadow);
+}
+.topbar__title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--green-deep);
+  margin: 0 8px 0 0;
+}
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tabs button {
+  border: 2px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  padding: 10px 18px;
+  border-radius: 14px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tabs button.is-on {
+  background: var(--green);
+  border-color: var(--green-deep);
+  color: #fff;
+}
+
+/* ── ручка глаза: видна на всех экранах ───────────────────────────── */
+.eyebar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-left: auto;
+  padding: 8px 12px;
+  background: #eef3ea;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+}
+.eyebar__seg { display: flex; }
+.eyebar__seg button {
+  border: 2px solid var(--blue);
+  background: var(--card);
+  color: var(--blue);
+  padding: 8px 14px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.eyebar__seg button:first-child { border-radius: 12px 0 0 12px; }
+.eyebar__seg button:last-child { border-radius: 0 12px 12px 0; }
+.eyebar__seg button.is-on { background: var(--blue); color: #fff; }
+.eyebar label { font-size: 15px; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; }
+.eyebar input[type='range'] { width: 120px; accent-color: var(--amber); }
+
+/* ── содержимое ───────────────────────────────────────────────────── */
+.page {
+  flex: 1;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 18px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.row { display: flex; gap: 16px; flex-wrap: wrap; align-items: stretch; }
+.card {
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+.card h2, .card h3 { margin: 0 0 10px; color: var(--green-deep); }
+.card h2 { font-size: 22px; }
+.card h3 { font-size: 18px; }
+.hint { color: var(--ink-soft); font-size: 16px; }
+
+/* крупные кнопки */
+.big {
+  border: none;
+  border-radius: 16px;
+  padding: 14px 26px;
+  font-size: 20px;
+  font-weight: 800;
+  cursor: pointer;
+  background: var(--green);
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+.big:disabled { background: #b8c2b0; cursor: not-allowed; }
+.big--alt { background: var(--blue); }
+.big--warn { background: var(--red); }
+.big--ghost { background: var(--card); color: var(--ink); border: 2px solid var(--line); }
+
+/* крупные цифры HUD */
+.stats { display: flex; gap: 14px; flex-wrap: wrap; }
+.stat {
+  min-width: 150px;
+  background: #f0f6ee;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+.stat b { display: block; font-size: 28px; color: var(--green-deep); }
+.stat span { font-size: 14px; color: var(--ink-soft); }
+.stat.is-bad b { color: var(--red); }
+
+/* пилоты-чипы */
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chips button {
+  border: 2px solid var(--line);
+  background: var(--card);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.chips button.is-on { background: var(--green); color: #fff; border-color: var(--green-deep); }
+.chips button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* арена */
+.arena-wrap { position: relative; flex: 1; min-width: 320px; }
+canvas.arena {
+  width: 100%;
+  height: 460px;
+  display: block;
+  border-radius: 16px;
+  border: 2px solid var(--line);
+  background: linear-gradient(#dff0fb 0%, #eaf6e2 78%, #cfe8c2 100%);
+}
+canvas.viewport--seeker {
+  width: 220px;
+  height: 220px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: #05080a;
+  display: block;
+}
+.seeker-side { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.seeker-cell { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.seeker-cell .cap { font-size: 15px; color: var(--ink-soft); font-weight: 700; }
+
+/* прогресс */
+.progress { height: 14px; border-radius: 8px; background: #e3e0d3; overflow: hidden; margin: 8px 0; }
+.progress i { display: block; height: 100%; background: var(--green); transition: width 0.2s; }
+
+/* доска */
+table.board { border-collapse: separate; border-spacing: 0 8px; width: 100%; }
+table.board th { text-align: left; font-size: 15px; color: var(--ink-soft); padding: 4px 10px; }
+table.board td { background: #f6f4ec; border: 2px solid var(--line); padding: 10px; font-size: 17px; }
+table.board td:first-child { border-radius: 12px 0 0 12px; font-weight: 700; }
+table.board td:last-child { border-radius: 0 12px 12px 0; }
+.bar { height: 16px; background: var(--green); border-radius: 8px; min-width: 2px; }
+.bar--peek { background: var(--amber); }
+.badge {
+  display: inline-block;
+  background: var(--amber);
+  color: #4a3200;
+  border-radius: 999px;
+  padding: 2px 12px;
+  font-size: 14px;
+  font-weight: 800;
+  margin-left: 8px;
+}
+
+/* карточки-галерея */
+.cards-strip { display: flex; gap: 10px; overflow-x: auto; padding: 6px 2px; }
+.cards-strip canvas { border-radius: 10px; border: 2px solid var(--line); flex: none; }
+
+.event-log { font-size: 15px; color: var(--ink-soft); max-height: 84px; overflow-y: auto; }
+.footer { padding: 10px 20px 24px; text-align: center; color: var(--ink-soft); font-size: 13px; }
