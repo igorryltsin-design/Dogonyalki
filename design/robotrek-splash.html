@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>РобоТрек — заставка</title>
+<style>
+  /* Загрузочная заставка «РобоТрек»: логотип перерисован в SVG, чтобы части
+     двигались по отдельности. Сценарий (~8,6 с): буквы «робо» выпрыгивают, шестерёнка
+     въезжает и крутится, появляется «ТРЕК», сквозь буквы петляет Шустрик,
+     Огонёк пикирует сверху, ловит его и садится на «б», из-за шестерёнки вырастает
+     манипулятор, поднимается и щёлкает захватом, глазки следят за ним и
+     моргают, затем всё плавно растворяется. */
+  :root { --orange: #ff6600; --ink: #111; --bg: #fff; }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
+  body { display: grid; place-items: center; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+
+  .splash { width: min(560px, 92vw); }
+  .splash svg { width: 100%; height: auto; display: block; overflow: visible; }
+
+  /* общий вход и растворение */
+  .logo { animation: enter .35s ease-out both, leave .8s ease-in 7.8s forwards; transform-origin: 250px 130px; }
+  @keyframes enter { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes leave { to { opacity: 0; transform: scale(1.05); filter: blur(4px) } }
+
+  /* Точки вращения и масштаба везде заданы числами в координатах рисунка:
+     Safari плохо понимает transform-box: fill-box (особенно у текста) и
+     крутил «ТРЕК» вокруг левого верхнего угла. */
+  /* буквы выпрыгивают по очереди */
+  .pop { animation: pop .55s cubic-bezier(.3,1.7,.5,1) both; }
+  .l1 { animation-delay: .10s } .l2 { animation-delay: .22s } .l3 { animation-delay: .34s } .l4 { animation-delay: .46s }
+  @keyframes pop { from { opacity: 0; transform: translateY(30px) scale(.4) } to { opacity: 1; transform: none } }
+
+  /* рука-манипулятор: после шестерёнки вырастает из-за неё — плечо, локоть,
+     предплечье, захват, — потом поднимается, кусает и возвращается на место */
+  .arm { fill: none; stroke: var(--orange); stroke-width: 13.5; stroke-linecap: butt; stroke-dasharray: 1 2; stroke-dashoffset: 1.01; }
+  .a3 { animation: draw .40s ease-in 4.40s forwards }
+  .a2 { animation: draw .35s ease-out 4.85s forwards }
+  .jaw { stroke-width: 17.4; stroke-linecap: butt; animation: draw .35s ease-out 5.15s forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0 } }
+  .joint { fill: var(--bg); stroke: var(--orange); stroke-width: 14; transform-origin: 237px 52px; animation: jpop .4s cubic-bezier(.3,1.8,.5,1) 4.70s both; }
+  @keyframes jpop { from { transform: scale(0) } to { transform: scale(1) } }
+
+  .shoulder { transform-origin: 342px 112px; animation: shoulder 1.7s 5.55s both; }
+  .elbow    { transform-origin: 237px 52px;  animation: elbow 1.7s 5.55s both; }
+  .wrist    { transform-origin: 95.8px 82px; animation: wrist 1.7s 5.55s both; }
+  .jaw-a    { transform-origin: 95.8px 82px; animation: draw .35s ease-out 5.15s forwards, jawA 1.7s 5.55s both; }
+  .jaw-b    { transform-origin: 95.8px 82px; animation: draw .35s ease-out 5.15s forwards, jawB 1.7s 5.55s both; }
+  @keyframes shoulder { 0% { transform: rotate(0) } 30% { transform: rotate(6deg) } 60% { transform: rotate(-1deg) } 82% { transform: rotate(1deg) } 100% { transform: rotate(0) } }
+  @keyframes elbow    { 0% { transform: rotate(0) } 30% { transform: rotate(9deg) } 60% { transform: rotate(-3deg) } 82% { transform: rotate(1.5deg) } 100% { transform: rotate(0) } }
+  @keyframes wrist    { 0% { transform: rotate(0) } 30% { transform: rotate(-16deg) } 60% { transform: rotate(8deg) } 100% { transform: rotate(0) } }
+  /* губки захвата: раскрываются на подъёме, щёлкают внизу */
+  @keyframes jawA { 0% { transform: rotate(0) } 28% { transform: rotate(16deg) } 52%, 68% { transform: rotate(-5deg) } 100% { transform: rotate(0) } }
+  @keyframes jawB { 0% { transform: rotate(0) } 28% { transform: rotate(-16deg) } 52%, 68% { transform: rotate(5deg) } 100% { transform: rotate(0) } }
+  .shoulder, .elbow, .wrist { animation-timing-function: ease-in-out; }
+
+  /* шестерёнка: въезжает с поворотом, потом крутится, пока заставка на экране */
+  .gear-in { transform-origin: 387px 144px; animation: gearin .9s cubic-bezier(.2,1.3,.4,1) .55s both; }
+  @keyframes gearin { from { opacity: 0; transform: scale(.3) rotate(-200deg) } to { opacity: 1; transform: none } }
+  .teeth { transform-origin: 387px 144px; animation: spin 2.4s linear 1.45s infinite; }
+  @keyframes spin { to { transform: rotate(360deg) } }
+  .trek { transform-origin: 383px 145px; animation: trek .45s cubic-bezier(.3,1.6,.5,1) 1.25s both; }
+  @keyframes trek { from { opacity: 0; transform: scale(.5) skewX(-12deg) } to { opacity: 1; transform: none } }
+
+  .lid { animation: blink .22s ease-in-out 1.55s, blink .26s ease-in-out 7.35s, blink .26s ease-in-out 7.7s; }
+  @keyframes blink { 50% { transform: scaleY(.1) } }
+
+  /* подпись */
+  .tag { animation: tag .6s ease-out 1.5s both; }
+  @keyframes tag { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pop, .arm, .jaw-a, .jaw-b, .joint, .shoulder, .elbow, .wrist, .gear-in, .teeth, .trek, .pupil, .lid, .tag, .chase-f, .chase-f > g, .wing { animation: none !important; stroke-dashoffset: 0; }
+    .trails, .chase-s, .star { display: none; }
+  }
+
+  /* chase:css */
+  /* погоня: сгенерировано tools/splash-chase.py — правьте там */
+  .chase-s { opacity: 0; transform-origin: 0 0; animation: s-move 3.00s linear 0.6s both, show .12s 0.6s both, gulp .3s ease-in 3.6s forwards; }
+  .chase-f { transform-origin: 0 0; transform: translate(192.0px, 87.0px) rotate(-209deg); animation: f-move 1.80s linear 1.8s backwards, f-perch 1.00s ease-out 3.6s forwards; }
+  .chase-f > g { animation: show .12s 1.8s both; }
+  .wing { animation: flap .07s linear 1.8s 40 alternate; }
+  .wing-l { transform-origin: -1px -2px } .wing-r { transform-origin: -1px 2px }
+  @keyframes flap { to { transform: scaleY(.35) } }
+  @keyframes show { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes gulp { from { opacity: 1; transform: translate(326px, 84px) scale(1) } to { opacity: 0; transform: translate(326px, 84px) scale(0) } }
+  .trail { fill: none; stroke-dasharray: 1 2; stroke-dashoffset: 1.01; }
+  .trail-s { stroke: #fff; stroke-width: 9; animation: draw 3.00s linear 0.6s forwards; }
+  .trail-f { stroke: #1f8a4c; stroke-width: 3; stroke-linecap: round; animation: draw 1.80s linear 1.8s forwards; }
+  .trails { animation: fade .45s ease-in 3.65s forwards; }
+  @keyframes fade { to { opacity: 0 } }
+  .star { transform-origin: 326px 84px; transform: scale(0); animation: star .5s ease-out 3.6s; }
+  @keyframes star { 0% { transform: scale(0) rotate(0) } 40% { transform: scale(1.25) rotate(40deg) } 100% { transform: scale(0) rotate(90deg); opacity: 0 } }
+  @keyframes s-move {
+    0.00% { transform: translate(-30.0px, 66.0px) }
+    2.78% { transform: translate(-14.0px, 69.7px) }
+    5.56% { transform: translate(2.0px, 73.6px) }
+    8.33% { transform: translate(17.2px, 79.8px) }
+    11.11% { transform: translate(30.8px, 89.0px) }
+    13.89% { transform: translate(41.3px, 101.5px) }
+    16.67% { transform: translate(49.3px, 115.9px) }
+    19.44% { transform: translate(56.4px, 130.7px) }
+    22.22% { transform: translate(63.2px, 145.7px) }
+    25.00% { transform: translate(70.2px, 160.6px) }
+    27.78% { transform: translate(77.7px, 175.2px) }
+    30.56% { transform: translate(86.8px, 188.9px) }
+    33.33% { transform: translate(100.8px, 195.6px) }
+    36.11% { transform: translate(112.0px, 183.9px) }
+    38.89% { transform: translate(119.5px, 169.3px) }
+    41.67% { transform: translate(126.1px, 154.2px) }
+    44.44% { transform: translate(132.5px, 139.1px) }
+    47.22% { transform: translate(139.2px, 124.1px) }
+    50.00% { transform: translate(147.1px, 109.7px) }
+    52.78% { transform: translate(158.9px, 98.5px) }
+    55.56% { transform: translate(173.4px, 104.1px) }
+    58.33% { transform: translate(183.8px, 116.8px) }
+    61.11% { transform: translate(192.7px, 130.7px) }
+    63.89% { transform: translate(201.0px, 144.9px) }
+    66.67% { transform: translate(209.2px, 159.1px) }
+    69.44% { transform: translate(217.7px, 173.2px) }
+    72.22% { transform: translate(227.1px, 186.7px) }
+    75.00% { transform: translate(239.4px, 197.4px) }
+    77.78% { transform: translate(254.3px, 192.9px) }
+    80.56% { transform: translate(264.7px, 180.1px) }
+    83.33% { transform: translate(272.9px, 165.9px) }
+    86.11% { transform: translate(280.2px, 151.1px) }
+    88.89% { transform: translate(287.1px, 136.2px) }
+    91.67% { transform: translate(294.3px, 121.5px) }
+    94.44% { transform: translate(303.3px, 107.7px) }
+    97.22% { transform: translate(314.0px, 95.2px) }
+    100.00% { transform: translate(326.0px, 84.0px) }
+  }
+  @keyframes f-move {
+    0.00% { transform: translate(-36.0px, 22.0px) rotate(12deg) }
+    2.78% { transform: translate(-25.8px, 24.2px) rotate(13deg) }
+    5.56% { transform: translate(-15.6px, 26.7px) rotate(13deg) }
+    8.33% { transform: translate(-5.5px, 29.1px) rotate(13deg) }
+    11.11% { transform: translate(4.7px, 31.4px) rotate(12deg) }
+    13.89% { transform: translate(14.9px, 33.6px) rotate(12deg) }
+    16.67% { transform: translate(25.2px, 35.6px) rotate(10deg) }
+    19.44% { transform: translate(35.4px, 37.4px) rotate(9deg) }
+    22.22% { transform: translate(45.8px, 38.8px) rotate(7deg) }
+    25.00% { transform: translate(56.2px, 39.8px) rotate(4deg) }
+    27.78% { transform: translate(66.6px, 40.1px) rotate(-0deg) }
+    30.56% { transform: translate(77.0px, 39.6px) rotate(-4deg) }
+    33.33% { transform: translate(87.4px, 38.6px) rotate(-7deg) }
+    36.11% { transform: translate(97.8px, 37.2px) rotate(-8deg) }
+    38.89% { transform: translate(108.1px, 35.6px) rotate(-9deg) }
+    41.67% { transform: translate(118.4px, 34.0px) rotate(-9deg) }
+    44.44% { transform: translate(128.7px, 32.4px) rotate(-8deg) }
+    47.22% { transform: translate(139.1px, 31.1px) rotate(-6deg) }
+    50.00% { transform: translate(149.5px, 30.2px) rotate(-3deg) }
+    52.78% { transform: translate(159.9px, 30.0px) rotate(0deg) }
+    55.56% { transform: translate(170.4px, 30.4px) rotate(3deg) }
+    58.33% { transform: translate(180.8px, 31.0px) rotate(4deg) }
+    61.11% { transform: translate(191.2px, 31.9px) rotate(6deg) }
+    63.89% { transform: translate(201.6px, 33.2px) rotate(8deg) }
+    66.67% { transform: translate(211.9px, 34.7px) rotate(10deg) }
+    69.44% { transform: translate(222.1px, 36.7px) rotate(12deg) }
+    72.22% { transform: translate(232.3px, 39.0px) rotate(14deg) }
+    75.00% { transform: translate(242.4px, 41.7px) rotate(16deg) }
+    77.78% { transform: translate(252.4px, 44.8px) rotate(19deg) }
+    80.56% { transform: translate(262.1px, 48.6px) rotate(23deg) }
+    83.33% { transform: translate(271.6px, 53.0px) rotate(26deg) }
+    86.11% { transform: translate(280.9px, 57.8px) rotate(28deg) }
+    88.89% { transform: translate(290.0px, 62.8px) rotate(29deg) }
+    91.67% { transform: translate(299.0px, 68.0px) rotate(30deg) }
+    94.44% { transform: translate(308.0px, 73.4px) rotate(31deg) }
+    97.22% { transform: translate(317.0px, 78.8px) rotate(31deg) }
+    100.00% { transform: translate(326.0px, 84.0px) rotate(30deg) }
+  }
+  @keyframes f-perch {
+    0.00% { transform: translate(326.0px, 84.0px) rotate(-127deg) }
+    6.25% { transform: translate(320.2px, 76.1px) rotate(-126deg) }
+    12.50% { transform: translate(314.4px, 68.2px) rotate(-128deg) }
+    18.75% { transform: translate(308.1px, 60.7px) rotate(-135deg) }
+    25.00% { transform: translate(300.7px, 54.3px) rotate(-149deg) }
+    31.25% { transform: translate(291.6px, 51.0px) rotate(-169deg) }
+    37.50% { transform: translate(281.9px, 50.7px) rotate(-183deg) }
+    43.75% { transform: translate(272.2px, 51.9px) rotate(-190deg) }
+    50.00% { transform: translate(262.6px, 54.0px) rotate(-194deg) }
+    56.25% { transform: translate(253.1px, 56.5px) rotate(-196deg) }
+    62.50% { transform: translate(243.8px, 59.4px) rotate(-200deg) }
+    68.75% { transform: translate(234.8px, 63.2px) rotate(-206deg) }
+    75.00% { transform: translate(226.2px, 67.9px) rotate(-209deg) }
+    81.25% { transform: translate(217.7px, 72.8px) rotate(-209deg) }
+    87.50% { transform: translate(209.1px, 77.5px) rotate(-209deg) }
+    93.75% { transform: translate(200.5px, 82.2px) rotate(-209deg) }
+    100.00% { transform: translate(192.0px, 87.0px) rotate(-209deg) }
+  }
+  /* глазки: следят за Шустриком, за поимкой, за рукой и захватом — и в конце смотрят на нас */
+  .p1 { animation: look1 6.70s linear 0.7s both; }
+  .p2 { animation: look2 6.70s linear 0.7s both; }
+  @keyframes look1 {
+    0.0% { transform: translate(0.0px, 0.0px) }
+    1.5% { transform: translate(-13.7px, -2.8px) }
+    3.0% { transform: translate(-13.8px, -2.6px) }
+    4.5% { transform: translate(-14.1px, -1.9px) }
+    6.0% { transform: translate(-14.4px, -0.8px) }
+    7.5% { transform: translate(-14.5px, 0.7px) }
+    9.0% { transform: translate(-14.2px, 2.5px) }
+    10.4% { transform: translate(-13.3px, 4.4px) }
+    11.9% { transform: translate(-12.1px, 5.8px) }
+    13.4% { transform: translate(-11.5px, 6.2px) }
+    14.9% { transform: translate(-12.1px, 5.8px) }
+    16.4% { transform: translate(-14.3px, 2.3px) }
+    17.9% { transform: translate(-8.5px, -6.4px) }
+    19.4% { transform: translate(-6.1px, -6.4px) }
+    20.9% { transform: translate(-4.8px, -5.9px) }
+    22.4% { transform: translate(-2.8px, -4.7px) }
+    23.9% { transform: translate(-1.2px, -2.6px) }
+    25.4% { transform: translate(-0.6px, -0.4px) }
+    26.9% { transform: translate(-0.6px, 1.5px) }
+    28.4% { transform: translate(-0.9px, 2.7px) }
+    29.9% { transform: translate(-1.2px, 3.5px) }
+    31.3% { transform: translate(-1.2px, 3.5px) }
+    32.8% { transform: translate(-0.8px, 2.7px) }
+    34.3% { transform: translate(-0.6px, 1.7px) }
+    35.8% { transform: translate(-0.5px, 0.8px) }
+    37.3% { transform: translate(-0.5px, -0.1px) }
+    38.8% { transform: translate(-0.6px, -0.8px) }
+    40.3% { transform: translate(-0.7px, -1.3px) }
+    41.8% { transform: translate(-0.8px, -1.6px) }
+    43.3% { transform: translate(-0.9px, -1.7px) }
+    44.8% { transform: translate(-0.9px, -1.7px) }
+    46.3% { transform: translate(-0.9px, -1.7px) }
+    47.8% { transform: translate(-0.9px, -1.7px) }
+    49.3% { transform: translate(-1.2px, -2.5px) }
+    50.7% { transform: translate(-1.6px, -3.3px) }
+    52.2% { transform: translate(-1.9px, -3.7px) }
+    53.7% { transform: translate(-2.2px, -4.0px) }
+    55.2% { transform: translate(-2.4px, -4.3px) }
+    56.7% { transform: translate(-0.7px, -1.2px) }
+    58.2% { transform: translate(-0.9px, -1.9px) }
+    59.7% { transform: translate(-1.3px, -2.7px) }
+    61.2% { transform: translate(-2.4px, -4.3px) }
+    62.7% { transform: translate(-3.4px, -5.2px) }
+    64.2% { transform: translate(-4.8px, -6.0px) }
+    65.7% { transform: translate(-7.0px, -6.5px) }
+    67.2% { transform: translate(-11.4px, -5.3px) }
+    68.7% { transform: translate(-11.4px, -5.3px) }
+    70.1% { transform: translate(-11.4px, -5.3px) }
+    71.6% { transform: translate(-11.4px, -5.3px) }
+    73.1% { transform: translate(-11.2px, -5.4px) }
+    74.6% { transform: translate(-10.9px, -5.6px) }
+    76.1% { transform: translate(-10.5px, -5.8px) }
+    77.6% { transform: translate(-10.2px, -5.9px) }
+    79.1% { transform: translate(-10.0px, -6.1px) }
+    80.6% { transform: translate(-9.9px, -6.1px) }
+    82.1% { transform: translate(-10.3px, -5.9px) }
+    83.6% { transform: translate(-10.6px, -5.8px) }
+    85.1% { transform: translate(-11.0px, -5.5px) }
+    86.6% { transform: translate(-11.5px, -5.3px) }
+    88.1% { transform: translate(-11.8px, -5.0px) }
+    89.6% { transform: translate(-11.6px, -5.2px) }
+    91.0% { transform: translate(-11.4px, -5.3px) }
+    92.5% { transform: translate(-11.2px, -5.5px) }
+    94.0% { transform: translate(-11.1px, -5.5px) }
+    95.5% { transform: translate(-11.2px, -5.4px) }
+    97.0% { transform: translate(-11.3px, -5.4px) }
+    98.5% { transform: translate(-7.5px, 0.5px) }
+    100.0% { transform: translate(-7.5px, 0.5px) }
+  }
+  @keyframes look2 {
+    0.0% { transform: translate(0.0px, 0.0px) }
+    1.5% { transform: translate(-12.8px, -1.2px) }
+    3.0% { transform: translate(-12.9px, -0.9px) }
+    4.5% { transform: translate(-12.9px, -0.5px) }
+    6.0% { transform: translate(-13.0px, 0.0px) }
+    7.5% { transform: translate(-13.0px, 0.6px) }
+    9.0% { transform: translate(-13.0px, 1.2px) }
+    10.4% { transform: translate(-12.9px, 1.8px) }
+    11.9% { transform: translate(-12.8px, 2.3px) }
+    13.4% { transform: translate(-12.8px, 2.1px) }
+    14.9% { transform: translate(-12.9px, 1.4px) }
+    16.4% { transform: translate(-13.0px, 0.6px) }
+    17.9% { transform: translate(-13.0px, -0.3px) }
+    19.4% { transform: translate(-12.8px, -1.2px) }
+    20.9% { transform: translate(-12.5px, -2.1px) }
+    22.4% { transform: translate(-12.5px, -2.0px) }
+    23.9% { transform: translate(-12.8px, -1.3px) }
+    25.4% { transform: translate(-13.0px, -0.1px) }
+    26.9% { transform: translate(-12.9px, 1.5px) }
+    28.4% { transform: translate(-12.4px, 3.3px) }
+    29.9% { transform: translate(-11.3px, 5.1px) }
+    31.3% { transform: translate(-9.9px, 6.3px) }
+    32.8% { transform: translate(-8.9px, 6.9px) }
+    34.3% { transform: translate(-8.0px, 7.2px) }
+    35.8% { transform: translate(-4.1px, 6.2px) }
+    37.3% { transform: translate(-1.5px, -4.8px) }
+    38.8% { transform: translate(-2.1px, -5.3px) }
+    40.3% { transform: translate(-2.0px, -5.3px) }
+    41.8% { transform: translate(-1.8px, -5.1px) }
+    43.3% { transform: translate(-1.7px, -5.0px) }
+    44.8% { transform: translate(-1.7px, -5.0px) }
+    46.3% { transform: translate(-1.7px, -5.0px) }
+    47.8% { transform: translate(-1.7px, -5.0px) }
+    49.3% { transform: translate(-3.5px, -6.0px) }
+    50.7% { transform: translate(-5.2px, -6.5px) }
+    52.2% { transform: translate(-7.2px, -6.4px) }
+    53.7% { transform: translate(-9.0px, -5.8px) }
+    55.2% { transform: translate(-10.6px, -4.8px) }
+    56.7% { transform: translate(-1.2px, -4.6px) }
+    58.2% { transform: translate(-3.6px, -6.1px) }
+    59.7% { transform: translate(-6.0px, -6.5px) }
+    61.2% { transform: translate(-8.8px, -5.9px) }
+    62.7% { transform: translate(-10.6px, -4.8px) }
+    64.2% { transform: translate(-11.5px, -3.8px) }
+    65.7% { transform: translate(-12.1px, -3.0px) }
+    67.2% { transform: translate(-12.6px, -1.8px) }
+    68.7% { transform: translate(-12.6px, -1.8px) }
+    70.1% { transform: translate(-12.6px, -1.8px) }
+    71.6% { transform: translate(-12.6px, -1.8px) }
+    73.1% { transform: translate(-12.6px, -2.0px) }
+    74.6% { transform: translate(-12.4px, -2.3px) }
+    76.1% { transform: translate(-12.3px, -2.5px) }
+    77.6% { transform: translate(-12.2px, -2.8px) }
+    79.1% { transform: translate(-12.0px, -3.1px) }
+    80.6% { transform: translate(-12.0px, -3.1px) }
+    82.1% { transform: translate(-12.2px, -2.8px) }
+    83.6% { transform: translate(-12.4px, -2.4px) }
+    85.1% { transform: translate(-12.5px, -2.1px) }
+    86.6% { transform: translate(-12.6px, -1.7px) }
+    88.1% { transform: translate(-12.7px, -1.5px) }
+    89.6% { transform: translate(-12.7px, -1.7px) }
+    91.0% { transform: translate(-12.6px, -1.8px) }
+    92.5% { transform: translate(-12.5px, -2.0px) }
+    94.0% { transform: translate(-12.5px, -2.0px) }
+    95.5% { transform: translate(-12.6px, -1.9px) }
+    97.0% { transform: translate(-12.6px, -1.9px) }
+    98.5% { transform: translate(-6.0px, 0.5px) }
+    100.0% { transform: translate(-6.0px, 0.5px) }
+  }
+  /* /chase:css */
+
+  .controls { position: fixed; bottom: 18px; left: 0; right: 0; display: flex; gap: 10px; justify-content: center; }
+  .controls button { font: inherit; font-size: 15px; padding: 8px 16px; border-radius: 999px; border: 1px solid #ddd; background: #fafafa; cursor: pointer; }
+  .controls label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #555; }
+</style>
+</head>
+<body>
+<div class="splash" id="splash">
+  <svg viewBox="0 0 500 240" id="art" role="img" aria-label="РобоТрек — твой путь в робототехнику">
+    <g class="logo">
+      <!-- рука-манипулятор растёт от шестерёнки: плечо → локоть → предплечье → захват -->
+      <g class="shoulder">
+        <path class="arm a3" pathLength="1" d="M342 112 L 257 63" />
+        <g class="elbow">
+          <path class="arm a2" pathLength="1" d="M216 56 L 116 74" />
+          <g class="wrist">
+            <!-- захват: кольцо с вырезом, две губки растут от места крепления -->
+            <path class="arm jaw jaw-a" pathLength="1" d="M118.3 76.0 A23.3 23.3 0 1 0 77.2 96.0" />
+            <path class="arm jaw jaw-b" pathLength="1" d="M116.0 70.35 A23.3 23.3 0 0 1 99.8 104.9" />
+          </g>
+        </g>
+        <circle class="joint" cx="237" cy="52" r="22" />
+      </g>
+
+      <!-- р -->
+      <g class="pop l1" style="transform-origin: 69.5px 188px">
+        <circle cx="69.5" cy="146" r="23" fill="none" stroke="var(--ink)" stroke-width="17" />
+        <line x1="47" y1="146" x2="47" y2="180" stroke="var(--ink)" stroke-width="17" stroke-linecap="round" />
+      </g>
+      <!-- о с глазом -->
+      <g class="pop l2" style="transform-origin: 138.5px 177px">
+        <circle cx="138.5" cy="146" r="22.5" fill="none" stroke="var(--orange)" stroke-width="18" />
+        <g class="lid" style="transform-origin: 146px 145.5px"><g class="pupil p1">
+          <circle cx="146" cy="145.5" r="6.5" fill="var(--ink)" />
+          <circle cx="148" cy="143.5" r="1.8" fill="#fff" />
+        </g></g>
+      </g>
+      <!-- б -->
+      <g class="pop l3" style="transform-origin: 208px 178px">
+        <circle cx="208" cy="146" r="23.75" fill="none" stroke="var(--ink)" stroke-width="17.5" />
+        <path d="M184.5 146 L184.5 101.5 L194.5 101.5" fill="none" stroke="var(--ink)" stroke-width="17" stroke-linecap="round" stroke-linejoin="round" />
+      </g>
+      <!-- о с глазом -->
+      <g class="pop l4" style="transform-origin: 278px 179px">
+        <circle cx="278" cy="146" r="24.5" fill="none" stroke="var(--orange)" stroke-width="16.5" />
+        <g class="lid" style="transform-origin: 284px 145.5px"><g class="pupil p2">
+          <circle cx="284" cy="145.5" r="6.5" fill="var(--ink)" />
+          <circle cx="286" cy="143.5" r="1.8" fill="#fff" />
+        </g></g>
+      </g>
+
+      <!-- шестерёнка «ТРЕК» -->
+      <g class="gear-in">
+        <g class="teeth"><path id="gear" fill="var(--orange)" fill-rule="evenodd" /></g>
+        <text class="trek" x="383" y="156" text-anchor="middle" font-size="30" font-weight="900" font-style="italic" fill="var(--ink)" textLength="74" lengthAdjust="spacingAndGlyphs" font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif">ТРЕК</text>
+      </g>
+
+      <!-- подпись -->
+      <text class="tag" x="41" y="208" font-size="15" fill="#666" textLength="282" lengthAdjust="spacingAndGlyphs">твой путь в робототехнику</text>
+
+      <!-- chase:svg -->
+      <!-- погоня: сгенерировано tools/splash-chase.py -->
+      <defs>
+        <mask id="trail-s-mask" maskUnits="userSpaceOnUse" x="-80" y="-40" width="660" height="320">
+          <path class="trail trail-s" pathLength="1" d="M-30.0 66.0 L-28.2 66.6 L-26.2 67.2 L-23.9 67.7 L-21.3 68.3 L-18.5 68.8 L-15.5 69.4 L-12.3 70.1 L-9.0 70.8 L-5.6 71.6 L-2.0 72.5 L1.6 73.5 L5.3 74.7 L9.1 76.1 L12.8 77.6 L16.5 79.4 L20.2 81.4 L23.8 83.6 L27.3 86.1 L30.7 88.9 L34.0 92.0 L37.2 95.7 L40.4 100.2 L43.6 105.3 L46.8 111.0 L50.0 117.2 L53.2 123.8 L56.4 130.7 L59.6 137.7 L62.8 144.7 L66.0 151.8 L69.2 158.6 L72.4 165.2 L75.6 171.4 L78.8 177.2 L82.0 182.4 L85.2 186.9 L88.4 190.6 L91.6 193.4 L94.8 195.3 L98.0 196.0 L101.2 195.4 L104.3 193.5 L107.4 190.4 L110.5 186.2 L113.6 181.1 L116.7 175.2 L119.8 168.8 L122.8 161.8 L125.9 154.6 L129.0 147.2 L132.1 139.9 L135.2 132.6 L138.4 125.7 L141.6 119.2 L144.9 113.3 L148.2 108.2 L151.5 103.9 L155.0 100.7 L158.4 98.7 L162.0 98.0 L165.7 98.8 L169.5 100.8 L173.3 104.0 L177.3 108.3 L181.4 113.4 L185.5 119.3 L189.7 125.8 L193.9 132.7 L198.1 139.9 L202.4 147.2 L206.6 154.6 L210.8 161.9 L215.0 168.9 L219.1 175.4 L223.2 181.4 L227.2 186.7 L231.0 191.2 L234.8 194.6 L238.5 197.0 L242.0 198.0 L245.4 197.8 L248.8 196.7 L252.2 194.6 L255.5 191.8 L258.8 188.2 L262.0 184.0 L265.2 179.3 L268.3 174.2 L271.4 168.7 L274.4 163.0 L277.3 157.1 L280.2 151.2 L282.9 145.2 L285.6 139.4 L288.3 133.8 L290.8 128.5 L293.2 123.5 L295.6 119.1 L297.8 115.2 L300.0 112.0 L302.1 109.3 L304.0 106.7 L305.9 104.4 L307.7 102.2 L309.4 100.3 L311.0 98.5 L312.5 96.8 L314.0 95.3 L315.3 93.9 L316.6 92.6 L317.9 91.5 L319.0 90.4 L320.1 89.4 L321.1 88.5 L322.1 87.7 L323.0 86.9 L323.8 86.1 L324.6 85.4 L325.3 84.7 L326.0 84.0 L326.0 84.0" />
+        </mask>
+      </defs>
+      <g class="trails">
+        <path d="M-30.0 66.0 L-28.2 66.6 L-26.2 67.2 L-23.9 67.7 L-21.3 68.3 L-18.5 68.8 L-15.5 69.4 L-12.3 70.1 L-9.0 70.8 L-5.6 71.6 L-2.0 72.5 L1.6 73.5 L5.3 74.7 L9.1 76.1 L12.8 77.6 L16.5 79.4 L20.2 81.4 L23.8 83.6 L27.3 86.1 L30.7 88.9 L34.0 92.0 L37.2 95.7 L40.4 100.2 L43.6 105.3 L46.8 111.0 L50.0 117.2 L53.2 123.8 L56.4 130.7 L59.6 137.7 L62.8 144.7 L66.0 151.8 L69.2 158.6 L72.4 165.2 L75.6 171.4 L78.8 177.2 L82.0 182.4 L85.2 186.9 L88.4 190.6 L91.6 193.4 L94.8 195.3 L98.0 196.0 L101.2 195.4 L104.3 193.5 L107.4 190.4 L110.5 186.2 L113.6 181.1 L116.7 175.2 L119.8 168.8 L122.8 161.8 L125.9 154.6 L129.0 147.2 L132.1 139.9 L135.2 132.6 L138.4 125.7 L141.6 119.2 L144.9 113.3 L148.2 108.2 L151.5 103.9 L155.0 100.7 L158.4 98.7 L162.0 98.0 L165.7 98.8 L169.5 100.8 L173.3 104.0 L177.3 108.3 L181.4 113.4 L185.5 119.3 L189.7 125.8 L193.9 132.7 L198.1 139.9 L202.4 147.2 L206.6 154.6 L210.8 161.9 L215.0 168.9 L219.1 175.4 L223.2 181.4 L227.2 186.7 L231.0 191.2 L234.8 194.6 L238.5 197.0 L242.0 198.0 L245.4 197.8 L248.8 196.7 L252.2 194.6 L255.5 191.8 L258.8 188.2 L262.0 184.0 L265.2 179.3 L268.3 174.2 L271.4 168.7 L274.4 163.0 L277.3 157.1 L280.2 151.2 L282.9 145.2 L285.6 139.4 L288.3 133.8 L290.8 128.5 L293.2 123.5 L295.6 119.1 L297.8 115.2 L300.0 112.0 L302.1 109.3 L304.0 106.7 L305.9 104.4 L307.7 102.2 L309.4 100.3 L311.0 98.5 L312.5 96.8 L314.0 95.3 L315.3 93.9 L316.6 92.6 L317.9 91.5 L319.0 90.4 L320.1 89.4 L321.1 88.5 L322.1 87.7 L323.0 86.9 L323.8 86.1 L324.6 85.4 L325.3 84.7 L326.0 84.0 L326.0 84.0" fill="none" stroke="#e04a2f" stroke-width="3" stroke-dasharray="6 5" mask="url(#trail-s-mask)" />
+        <path class="trail trail-f" pathLength="1" d="M-36.0 22.0 L-33.4 22.5 L-30.3 23.2 L-26.8 24.0 L-23.0 24.9 L-18.8 25.9 L-14.4 27.0 L-9.7 28.1 L-4.7 29.2 L0.4 30.4 L5.8 31.6 L11.2 32.8 L16.7 34.0 L22.3 35.1 L27.9 36.1 L33.5 37.0 L39.0 37.9 L44.5 38.6 L49.8 39.3 L55.0 39.7 L60.0 40.0 L64.9 40.1 L69.9 40.0 L74.9 39.8 L79.9 39.4 L85.0 38.9 L90.0 38.3 L95.1 37.6 L100.2 36.9 L105.3 36.1 L110.4 35.2 L115.5 34.4 L120.5 33.6 L125.6 32.8 L130.6 32.1 L135.6 31.5 L140.6 30.9 L145.5 30.5 L150.4 30.2 L155.2 30.0 L160.0 30.0 L164.7 30.1 L169.5 30.3 L174.2 30.6 L178.9 30.8 L183.5 31.2 L188.2 31.6 L192.8 32.1 L197.4 32.6 L202.0 33.2 L206.5 33.9 L211.0 34.6 L215.5 35.4 L219.9 36.2 L224.3 37.1 L228.7 38.1 L233.1 39.2 L237.4 40.3 L241.6 41.4 L245.8 42.7 L250.0 44.0 L254.2 45.5 L258.5 47.1 L262.9 49.0 L267.3 51.0 L271.8 53.1 L276.2 55.3 L280.7 57.7 L285.1 60.0 L289.4 62.5 L293.6 64.9 L297.8 67.3 L301.7 69.6 L305.6 71.9 L309.2 74.1 L312.7 76.2 L315.9 78.1 L318.9 79.9 L321.5 81.5 L323.9 82.9 L326.0 84.0 L326.0 84.0" />
+      </g>
+      <!-- Шустрик -->
+      <g class="chase-s">
+        <circle r="8" fill="#e04a2f" stroke="#fff" stroke-width="1.5" />
+        <circle cx="-2.5" cy="-2.8" r="2.4" fill="#fff" opacity=".85" />
+      </g>
+      <!-- Огонёк: муха сверху, голова смотрит по ходу полёта -->
+      <g class="chase-f"><g transform="scale(1.3)">
+        <g class="wing wing-l"><ellipse cx="-5" cy="-6.5" rx="9.5" ry="4.2" transform="rotate(22 -5 -6.5)" fill="#dcebf5" fill-opacity=".85" stroke="#8fa9bb" stroke-width=".8" /></g>
+        <g class="wing wing-r"><ellipse cx="-5" cy="6.5" rx="9.5" ry="4.2" transform="rotate(-22 -5 6.5)" fill="#dcebf5" fill-opacity=".85" stroke="#8fa9bb" stroke-width=".8" /></g>
+        <ellipse cx="-6" cy="0" rx="8" ry="4.6" fill="#6b4226" />
+        <path d="M-10 -3.6 v7.2 M-6.5 -4.4 v8.8" stroke="#3b2414" stroke-width="1.3" />
+        <circle cx="3.5" cy="0" r="4.2" fill="#7d4f2c" />
+        <circle cx="8.8" cy="0" r="3.4" fill="#8a5631" />
+        <circle cx="9.6" cy="-2.6" r="2.1" fill="#d0312d" />
+        <circle cx="9.6" cy="2.6" r="2.1" fill="#d0312d" />
+      </g></g>
+      <!-- звёздочка поимки -->
+      <path class="star" fill="#ffc21a" stroke="#ff8a00" stroke-width="1.2" d="M326 67 L330.5 79.5 L343 84 L330.5 88.5 L326 101 L321.5 88.5 L309 84 L321.5 79.5 Z" />
+      <!-- /chase:svg -->
+    </g>
+  </svg>
+</div>
+
+<div class="controls">
+  <button id="again">▶ Ещё раз</button>
+  <label><input type="checkbox" id="loop" /> по кругу</label>
+</div>
+
+<script>
+  // Шестерёнка: 20 зубцов-трапеций вокруг (387,144) и круглое окно под «ТРЕК»
+  (function () {
+    const cx = 387, cy = 144, R = 75, r = 64, hole = 47.5, n = 20
+    let d = ''
+    for (let i = 0; i < n; i++) {
+      const s = (Math.PI * 2) / n, a = i * s - s * 0.27
+      const pts = [[r, a], [R, a + s * 0.12], [R, a + s * 0.42], [r, a + s * 0.54], [r, a + s]]
+      for (const [rad, ang] of pts) d += (d ? 'L' : 'M') + (cx + rad * Math.cos(ang)).toFixed(1) + ' ' + (cy + rad * Math.sin(ang)).toFixed(1)
+    }
+    d += 'Z M' + (cx + hole) + ' ' + cy + ' a' + hole + ' ' + hole + ' 0 1 0 ' + -2 * hole + ' 0 a' + hole + ' ' + hole + ' 0 1 0 ' + 2 * hole + ' 0Z'
+    document.getElementById('gear').setAttribute('d', d)
+  })()
+
+  // Перезапуск: клонируем SVG, чтобы все CSS-анимации начались заново
+  const host = document.getElementById('splash')
+  function replay() {
+    const svg = host.querySelector('svg')
+    host.replaceChild(svg.cloneNode(true), svg)
+  }
+  document.getElementById('again').onclick = replay
+  setInterval(() => { if (document.getElementById('loop').checked) replay() }, 9200)
+</script>
+</body>
+</html>

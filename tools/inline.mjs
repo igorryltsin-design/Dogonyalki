@@ -22,10 +22,11 @@ const jsSafe = jsText.replace(/<\//g, '<\\/')
 
 // Замена — функцией, а не строкой: в минифицированном JS попадаются `$&`, `$'`
 // и `$1`, и строковая замена расшифровала бы их как спецссылки на куски HTML.
-html = html.replace(
-  /<script\s+type="module"[^>]*src="[^"]*"[^>]*><\/script>/,
-  () => `<script type="module">${jsSafe}</script>`,
-)
+// Модуль — в самый конец <body>, а не в <head>, куда его ставит Vite: иначе
+// браузер сначала читает 2 МБ скрипта и только потом доходит до заставки.
+// Модуль всё равно отложенный, так что порядок запуска не меняется.
+html = html.replace(/\s*<script\s+type="module"[^>]*src="[^"]*"[^>]*><\/script>/, '')
+html = html.replace(/<\/body>/, () => `<script type="module">${jsSafe}</script>\n  </body>`)
 html = html.replace(/<link\s+rel="stylesheet"[^>]*href="[^"]*"[^>]*>/, () => `<style>${cssText}</style>`)
 
 writeFileSync(htmlPath, html)

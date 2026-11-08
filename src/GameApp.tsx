@@ -209,7 +209,20 @@ function Shell() {
   )
 }
 
+/** Сообщает заставке из index.html, что игра собрана и нарисована. Эффект
+ *  корня срабатывает после эффектов всех детей (и 3D-арены), а два кадра
+ *  дают браузеру успеть показать экран — заставка растворяется над готовым. */
+function useAnnounceReady() {
+  useEffect(() => {
+    let id = requestAnimationFrame(() => {
+      id = requestAnimationFrame(() => window.dispatchEvent(new Event('dogonyalki:ready')))
+    })
+    return () => cancelAnimationFrame(id)
+  }, [])
+}
+
 export function GameApp() {
+  useAnnounceReady()
   return (
     <SettingsProvider>
       <Shell />
