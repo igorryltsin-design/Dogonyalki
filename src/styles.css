@@ -346,7 +346,6 @@ table.board td:last-child { border-radius: 0 12px 12px 0; }
 .cards-strip canvas { border-radius: 10px; border: 2px solid var(--line); flex: none; }
 
 .event-log { font-size: 15px; color: var(--ink-soft); max-height: 84px; overflow-y: auto; }
-.footer { padding: 10px 20px 24px; text-align: center; color: var(--ink-soft); font-size: 13px; }
 
 /* ── телефон: всё, что выше, перебиваем здесь ──────────────────────── */
 /* этот блок живёт в самом конце файла: мобильные правила спорят с

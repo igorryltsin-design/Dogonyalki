@@ -1,3 +1,4 @@
+import { CLEAR_BUSH, CLEAR_TREE, CLEAR_TUFT, clearOfPath, type PathPoint } from './field'
 import { hashSeed } from './rng'
 import type { GameFrame } from './types'
 
@@ -70,7 +71,7 @@ function fit(canvas: HTMLCanvasElement): { ctx: CanvasRenderingContext2D; w: num
 export function drawPursuit(
   canvas: HTMLCanvasElement,
   fr: GameFrame,
-  opts: { color: string; trail: Trail; night?: boolean },
+  opts: { color: string; trail: Trail; night?: boolean; path?: PathPoint[] },
 ): void {
   const box = fit(canvas)
   if (!box) return
@@ -94,7 +95,14 @@ export function drawPursuit(
   // именно это выдаёт скорость и направление. Раскладка детерминирована по
   // координатам решётки: тот же кусок поля выглядит одинаково в любой момент
   // погони и в обоих видах.
-  const CELL = 7
+  //
+  // Высокое над тропой не растёт: дерево, посаженное на путь, выглядело бы так,
+  // будто бойцы пробегают сквозь ствол. Поэтому для каждой приметы свой зазор
+  // до тропы — тот же, что держит объёмная сцена (см. ./field.ts): дерево
+  // сторонится погони на пять метров, куст на два с половиной, а травинка
+  // может лежать и в полуметре: сквозь неё не идёшь, и именно она ближе всего
+  // показывает, с какой скоростью бежит погоня.
+  const CELL = 3.5
   const x0 = cx - halfX - CELL
   const x1 = cx + halfX + CELL
   const y0 = cy - halfY - CELL
@@ -103,16 +111,20 @@ export function drawPursuit(
   for (let ix = Math.floor(x0 / CELL); ix <= Math.ceil(x1 / CELL); ix += 1) {
     for (let iy = Math.floor(y0 / CELL); iy <= Math.ceil(y1 / CELL); iy += 1) {
       const seed = hashSeed(ix, iy)
-      if (seed % 5 === 0) continue // пусто: луг не вымазан точками сплошь
+      const tier = seed % 8
+      if (tier === 0) continue // пусто: луг не вымазан точками сплошь
       const wx = ix * CELL + (seed % 17) / 17 * CELL * 0.7
       const wy = iy * CELL + ((seed >> 5) % 13) / 13 * CELL * 0.7
+      // ярусы в тех же пропорциях, что в объёме: дерево редкое, трава густая
+      const kind = tier === 1 ? 'tree' : tier <= 3 ? 'bush' : 'grass'
+      const clear = kind === 'tree' ? CLEAR_TREE : kind === 'bush' ? CLEAR_BUSH : CLEAR_TUFT
+      if (opts.path && !clearOfPath(opts.path, wx, wy, clear)) continue
       const [sx, sy] = px(wx, wy)
-      const big = seed % 5 === 1 // дерево: крупнее и с тёмным ободком ствола
-      const r = Math.max(2, k * (big ? 1.15 : 0.5))
+      const r = Math.max(1.5, k * (kind === 'tree' ? 1.9 : kind === 'bush' ? 0.6 : 0.18))
       ctx.beginPath()
       ctx.arc(sx, sy, r, 0, Math.PI * 2)
       ctx.fill()
-      if (big) {
+      if (kind === 'tree') {
         ctx.strokeStyle = pal.markStem
         ctx.lineWidth = 2
         ctx.beginPath()

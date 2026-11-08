@@ -7,6 +7,7 @@ import { loadCards } from '../cards'
 import { SeekerView } from '../SeekerView'
 import { Stat } from '../ui-kid/Stat'
 import { Arena3D } from '../Arena3D'
+import { pursuitPath, type PathPoint } from '../field'
 import { drawPursuit, emptyTrail, stepTrail, type Trail } from '../topdown'
 
 /** Экран «Арена»: погоня Огонька за Шустриком. Два вида одного и того же
@@ -69,6 +70,9 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
   const lastFrameRef = useRef<GameFrame | null>(null)
   const frameSink = useRef<((fr: GameFrame | null) => void) | null>(null)
   const trailRef = useRef<Trail>(emptyTrail())
+  // тропа этого погоня: по ней поле раскладывают так, чтобы ни одно дерево не
+  // встало на дорогу бегущим
+  const [path, setPath] = useState<PathPoint[]>([])
 
   const net = loadNet()
   const cards = loadCards(eye)
@@ -117,12 +121,15 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
     const canvas = canvasRef.current
     if (!canvas || !fr) return
     lastFrameRef.current = fr
-    drawPursuit(canvas, fr, { color: PILOT_COLOR[pilot], trail: trailRef.current, night })
+    drawPursuit(canvas, fr, { color: PILOT_COLOR[pilot], trail: trailRef.current, night, path })
   }
 
-  /** Пока никто не бежал, показываем стойку на старте: поле не пустое. */
+  /** Пока никто не бежал, показываем стойку на старте: поле не пустое. Тропу
+   *  для раскладки поля считаем по тому же сценарию — прогон чистый, ~14 мс. */
   useEffect(() => {
-    const gen = localRun({ ...DEFAULT_CHASE, eye }, { pilot })
+    const sc = { ...DEFAULT_CHASE, eye }
+    setPath(pursuitPath(sc, pilot, pilot === 'kid' ? predict : undefined))
+    const gen = localRun(sc, { pilot })
     const first = gen.next()
     if (!first.done) {
       lastFrameRef.current = first.value
@@ -145,6 +152,9 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
     trailRef.current = emptyTrail()
     const sc = { ...DEFAULT_CHASE, eye, seed: runSeed }
     setRunSeed((s) => s + 1)
+    // поле перекладывают под тропу этого пуска: прогон тот же генератор, то же
+    // зерно — пути совпадают кадр в кадр, а ~14 мс на кнопку незаметны
+    setPath(pursuitPath(sc, pilot, pilot === 'kid' ? predict : undefined))
     const gen = localRun(sc, { pilot: pilot === 'kid' ? 'kid' : pilot, predict: pilot === 'kid' ? predict : undefined })
     let last: GameFrame | null = null
     let i = 0
@@ -180,6 +190,9 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
     rafRef.current = requestAnimationFrame(step)
   }
 
+  /** Серия из десяти погонь считается молча — её кадры не идут на экран, а
+   *  только складываются в итог. Поле поэтому остаётся от последнего живого
+   *  пуска: перекладывать его не под что, картинка во время серии стоит. */
   async function startTen() {
     cancelAnimationFrame(rafRef.current)
     setBusy(true)
@@ -247,6 +260,7 @@ export function ArenaScreen({ eye }: { eye: EyeConfig }) {
             tagRadius={DEFAULT_CHASE.tag_radius_m}
             runKey={runKey}
             night={night}
+            path={path}
           >
             {banner}
           </Arena3D>

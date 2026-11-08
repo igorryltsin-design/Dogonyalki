@@ -5,6 +5,7 @@ import { getW, innateW } from '../brain'
 import { flyIsInnate, resetFly, trainFly } from '../trainLocal'
 import { CHANNELS, DRAWN_NEURONS, REAL_NEURONS, REGIONS, regionActivity } from '../anatomy'
 import { Brain3D } from '../Brain3D'
+import { pursuitPath, type PathPoint } from '../field'
 import { Stat } from '../ui-kid/Stat'
 import { drawPursuit, emptyTrail, stepTrail, type Trail } from '../topdown'
 import type { EyeConfig, GameFrame } from '../types'
@@ -34,6 +35,7 @@ export function BrainScreen({ eye }: { eye: EyeConfig }) {
   const stopRef = useRef(false)
   const miniRef = useRef<HTMLCanvasElement>(null)
   const trailRef = useRef<Trail>(emptyTrail())
+  const pathRef = useRef<PathPoint[]>([])
 
   useEffect(() => {
     let raf = 0
@@ -41,7 +43,13 @@ export function BrainScreen({ eye }: { eye: EyeConfig }) {
     genRef.current = null
     const step = () => {
       if (!alive) return
-      if (!genRef.current) genRef.current = localRun(chaseVariant(seedRef.current, eye), { pilot: 'fly' })
+      if (!genRef.current) {
+        const sc = chaseVariant(seedRef.current, eye)
+        genRef.current = localRun(sc, { pilot: 'fly' })
+        // приметы плоской схемы рисуют мимо тропы: тот же прогон, то же зерно,
+        // значит и тропа совпадает с живой покадрово
+        pathRef.current = pursuitPath(sc, 'fly')
+      }
       const nx = genRef.current.next()
       if (nx.done) {
         seedRef.current = (seedRef.current + 1) % 24
@@ -62,7 +70,7 @@ export function BrainScreen({ eye }: { eye: EyeConfig }) {
     const canvas = miniRef.current
     if (!canvas || !fr) return
     stepTrail(trailRef.current, fr)
-    drawPursuit(canvas, fr, { color: '#2e9e5b', trail: trailRef.current })
+    drawPursuit(canvas, fr, { color: '#2e9e5b', trail: trailRef.current, path: pathRef.current })
   }, [fr])
 
   const w = getW()

@@ -39,9 +39,6 @@ export function GameApp() {
       {screen === 'eye' && <EyeScreen eye={eye} />}
       {screen === 'brain' && <BrainScreen eye={eye} />}
       {screen === 'board' && <BoardScreen eye={eye} />}
-      <footer className="footer">
-        Учебная игра по материалам курса NNTrack · модель мозга мухи — FlyWire (CC BY-NC-SA 4.0) · без сервера и интернета
-      </footer>
     </div>
   )
 }

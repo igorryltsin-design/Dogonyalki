@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { CORRIDOR_HALF_M, DECOR_X0, DECOR_X1, flyModel, kidModel, makeScenery } from './Arena3D'
+import { DECOR_X0, DECOR_X1, flyModel, kidModel, makeScenery } from './Arena3D'
+import { CLEAR_BUSH, CLEAR_TREE, clearOfPath, type PathPoint, pursuitPath } from './field'
+import { DEFAULT_CHASE, EYE_FLY } from './types'
 
 /** Проверки арены без единого пикселя: что модель собрана как существо, а не
  *  как шарик, и что приметы поля стоят там, где должны, — вне дорожки бегунов
@@ -106,7 +108,11 @@ describe('модель Шустрика', () => {
 })
 
 describe('приметы поля', () => {
-  const scenery = makeScenery()
+  /** Тропа считается по-настоящему: тем же генератором, что потом показывает
+   *  экран. На глаз «беговая полоса» была узкой — боковой манёвр уводил
+   *  погоню за ±30 м, и деревья оказывались прямо на пути. */
+  const path = pursuitPath({ ...DEFAULT_CHASE, eye: EYE_FLY }, 'fly')
+  const scenery = makeScenery(path)
   const masses = scenery.obj.children.filter((c) => (c as THREE.InstancedMesh).isInstancedMesh) as THREE.InstancedMesh[]
   const [trunks, crowns, bushes, tufts] = masses
   const at = (m: THREE.InstancedMesh, i: number) => {
@@ -118,10 +124,19 @@ describe('приметы поля', () => {
     mat.decompose(p, q, s)
     return { p, s }
   }
+  /** осям движка из мировых: вбок — это −z сцены */
+  const side = (p: THREE.Vector3) => -p.z
 
   it('собраны в четыре массы — сцена не дорожает с числом деревьев', () => {
     expect(masses.length).toBe(4)
-    expect([trunks.count, crowns.count, bushes.count, tufts.count]).toEqual([84, 84, 150, 420])
+    // ёмкость та же, но кто не влез мимо тропы — тот не посажен
+    expect(trunks.count).toBeLessThanOrEqual(84)
+    expect(crowns.count).toBe(trunks.count)
+    expect(bushes.count).toBeLessThanOrEqual(150)
+    expect(tufts.count).toBeLessThanOrEqual(420)
+    expect(trunks.count).toBeGreaterThan(60)
+    expect(bushes.count).toBeGreaterThan(100)
+    expect(tufts.count).toBeGreaterThan(250)
   })
 
   it('дерево не распадается: ствол и крона делят один рост и поворот', () => {
@@ -133,11 +148,11 @@ describe('приметы поля', () => {
     }
   })
 
-  it('ни одного дерева и куста на беговой дорожке', () => {
-    for (const m of [trunks, crowns, bushes]) {
+  it('ни одного дерева и куста на тропе погони', () => {
+    for (const [m, clear] of [[trunks, CLEAR_TREE], [crowns, CLEAR_TREE], [bushes, CLEAR_BUSH]] as const) {
       for (let i = 0; i < m.count; i += 1) {
         const { p } = at(m, i)
-        expect(Math.abs(p.z), 'прятает модель').toBeGreaterThan(CORRIDOR_HALF_M)
+        expect(clearOfPath(path, p.x, side(p), clear), `прятает модель на №${i}`).toBe(true)
         expect(p.x).toBeGreaterThanOrEqual(DECOR_X0 - 1)
         expect(p.x).toBeLessThanOrEqual(DECOR_X1 + 1)
         expect(p.y, 'не на земле').toBeCloseTo(0, 6)
@@ -145,12 +160,33 @@ describe('приметы поля', () => {
     }
   })
 
-  it('травинки лежат и в дорожке: под ногами видно, что поле бежит', () => {
-    let inside = 0
+  it('травинки держатся у самых ног: по них видно, что поле бежит', () => {
+    let near = 0
     for (let i = 0; i < tufts.count; i += 1) {
       const { p } = at(tufts, i)
-      if (Math.abs(p.z) <= CORRIDOR_HALF_M) inside += 1
+      if (!clearOfPath(path, p.x, side(p), 8)) near += 1
     }
-    expect(inside).toBeGreaterThan(tufts.count / 2)
+    expect(near, 'трава разъехалась по полю — скорость читать нечем').toBeGreaterThan(tufts.count * 0.8)
+  })
+
+  it('поле перекладывают под новый путь', () => {
+    const f = makeScenery([])
+    const t = trunksOf(f)
+    // дорога проложена ровно через два уже посаженных дерева — так проверка
+    // гарантирует, что перекладывать есть чего
+    const one = at(t, 3).p
+    const two = at(t, 7).p
+    const road: PathPoint[] = [[one.x, -one.z], [two.x, -two.z]]
+    f.lay(road)
+    expect(t.count, 'от дороги поле поредело').toBeGreaterThan(60)
+    for (let i = 0; i < t.count; i += 1) {
+      const { p } = at(t, i)
+      expect(clearOfPath(road, p.x, -p.z, CLEAR_TREE), `дерево №${i} встало на новую тропу`).toBe(true)
+    }
   })
 })
+
+/** первый ствол из поля — он же «деревья» в тестах перекладки */
+function trunksOf(s: ReturnType<typeof makeScenery>): THREE.InstancedMesh {
+  return s.obj.children.filter((c) => (c as THREE.InstancedMesh).isInstancedMesh)[0] as THREE.InstancedMesh
+}

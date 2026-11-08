@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { makeRng } from './rng'
+import { CLEAR_BUSH, CLEAR_TREE, CLEAR_TUFT, clearOfPath, type PathPoint } from './field'
 import type { GameFrame, Pilot } from './types'
 
 /** Трёхмерная арена: та же погоня, что рисовалась видом сверху, но в объёме —
@@ -279,92 +280,142 @@ export function kidModel(): Kid {
   return { obj: g, armR, armL, legR, legL, shirtMat, skinMat, hairMat, pantsMat, shoeMat }
 }
 
-/** Поле: деревья по обеим сторонам коридора, кусты и травинки в самом
- *  коридоре. Неподвижные приметы — единственное, что выдаёт скорость и
- *  направление на ровном лугу: без них погоня выглядит бегущими по столу.
- *  Всё собрано в четыре массы (instanced), поэтому на школьном ноутбуке цена
- *  сцены — четыре вызова отрисовки, сколько бы деревьев ни росло. */
+/** Поле: приметы стоят там, где по ним никто не бегает. Неподвижные приметы —
+ *  единственное, что выдаёт скорость и направление на ровном лугу: без них
+ *  погоня выглядит бегущими по столу. Но дерево, посаженное на тропу, даёт
+ *  ровно противоположный эффект — и муха, и Шустрик проходят сквозь ствол.
+ *  Поэтому поле раскладывают по настоящему пути этого погоня (см. ./field.ts),
+ *  а не по дорожке, прикинутой на глаз.
+ *  Всё собрано в четыре массы, поэтому на школьном ноутбуке цена сцены —
+ *  четыре вызова отрисовки, сколько бы деревьев ни росло. */
 export const DECOR_X0 = -70
 export const DECOR_X1 = 330
-/** коридор, в котором никто не садит деревья и кусты: там бегут, и
- *  модель пропала бы за стволом */
-export const CORRIDOR_HALF_M = 3
+/** насколько вбок от стартовой линии распускается поле */
+export const DECOR_Y = 58
 
-export function makeScenery(): {
+type Scenery = {
   obj: THREE.Group
-  mats: { trunk: THREE.MeshLambertMaterial; crown: THREE.MeshLambertMaterial; bush: THREE.MeshLambertMaterial; tuft: THREE.MeshLambertMaterial }
-} {
-  const rng = makeRng(20260517)
+  mats: {
+    trunk: THREE.MeshLambertMaterial
+    crown: THREE.MeshLambertMaterial
+    bush: THREE.MeshLambertMaterial
+    tuft: THREE.MeshLambertMaterial
+  }
+  /** переложить поле под новый путь — те же массы, только матрицы экземпляров */
+  lay: (path: PathPoint[]) => void
+}
+
+export function makeScenery(path: PathPoint[] = []): Scenery {
   const group = new THREE.Group()
   const trunkMat = new THREE.MeshLambertMaterial({ color: THEME.day.trunk })
   const crownMat = new THREE.MeshLambertMaterial({ color: THEME.day.crown })
   const bushMat = new THREE.MeshLambertMaterial({ color: THEME.day.bush })
   const tuftMat = new THREE.MeshLambertMaterial({ color: THEME.day.tuft })
+  const mats = { trunk: trunkMat, crown: crownMat, bush: bushMat, tuft: tuftMat }
 
-  /** Ставит экземпляр в точку (x, z) с поворотом ry и масштабом (s, s·sy, s).
-   *  Координаты здесь уже мировые: x — вдоль поля, z — поперёк. Высота сидит
-   *  в самой геометрии (она поднята вверх наполовину), поэтому любой масштаб
-   *  оставляет предмет прижатым к земле. */
-  const place = (mesh: THREE.InstancedMesh, i: number, x: number, z: number, s: number, sy: number, ry: number) => {
+  /** Ставит экземпляр в точку поля (x — вперёд, y — вбок) с поворотом ry и
+   *  масштабом (s, s·sy, s). Координаты движковы, а world здесь берут один раз:
+   *  z сцены — это −y поля, иначе поле и бойцы смотрели бы в разные стороны.
+   *  Высота сидит в самой геометрии (она поднята вверх наполовину), поэтому
+   *  любой масштаб оставляет предмет прижатым к земле. */
+  const place = (mesh: THREE.InstancedMesh, i: number, x: number, y: number, s: number, sy: number, ry: number) => {
     mesh.setMatrixAt(
       i,
       new THREE.Matrix4().compose(
-        new THREE.Vector3(x, 0, z),
+        new THREE.Vector3(x, 0, -y),
         new THREE.Quaternion().setFromAxisAngle(UP, ry),
         new THREE.Vector3(s, s * sy, s),
       ),
     )
   }
 
-  // деревья: ствол и крона — две отдельные массы, чтобы не смешивать два
-  // цвета в одной геометрии; ставим их по обе стороны от беговой дорожки
+  /** Ищет свободное место: не ближе `clear` метров к тропе погони. */
+  const spot = (rng: () => number, pts: PathPoint[], yMin: number, clear: number) => {
+    for (let tries = 0; tries < 30; tries += 1) {
+      const x = DECOR_X0 + rng() * (DECOR_X1 - DECOR_X0)
+      const y = (rng() > 0.5 ? 1 : -1) * (yMin + rng() * (DECOR_Y - yMin))
+      if (clearOfPath(pts, x, y, clear)) return { x, y }
+    }
+    return null
+  }
+
   const N_TREE = 84
+  const N_BUSH = 150
+  const N_TUFT = 420
   const trunkGeo = new THREE.CylinderGeometry(0.26, 0.36, 2.6, 6)
   trunkGeo.translate(0, 1.3, 0)
   const crownGeo = new THREE.SphereGeometry(1.7, 10, 8)
   crownGeo.translate(0, 3.4, 0)
-  const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, N_TREE)
-  const crowns = new THREE.InstancedMesh(crownGeo, crownMat, N_TREE)
-  for (let i = 0; i < N_TREE; i += 1) {
-    const x = DECOR_X0 + rng() * (DECOR_X1 - DECOR_X0)
-    const z = (rng() > 0.5 ? 1 : -1) * (CORRIDOR_HALF_M + 1.5 + rng() * 55)
-    const s = 0.8 + rng() * 1.5
-    // рост и поворот — ОДНИ на ствол и крону: иначе ствол и крона разъехались
-    // бы разными масштабами, и дерево распалось бы на две половинки
-    const sy = 0.75 + rng() * 0.55
-    const ry = rng() * Math.PI
-    place(trunks, i, x, z, s, sy, ry)
-    place(crowns, i, x, z, s, sy, ry)
-  }
-  trunks.instanceMatrix.needsUpdate = true
-  crowns.instanceMatrix.needsUpdate = true
-
-  const N_BUSH = 150
   const bushGeo = new THREE.SphereGeometry(0.85, 8, 6)
   bushGeo.translate(0, 0.45, 0)
-  const bushes = new THREE.InstancedMesh(bushGeo, bushMat, N_BUSH)
-  for (let i = 0; i < N_BUSH; i += 1) {
-    const x = DECOR_X0 + rng() * (DECOR_X1 - DECOR_X0)
-    const z = (rng() > 0.5 ? 1 : -1) * (CORRIDOR_HALF_M + 0.6 + rng() * 62)
-    place(bushes, i, x, z, 0.7 + rng() * 1.1, 0.6 + rng() * 0.6, rng() * Math.PI)
-  }
-  bushes.instanceMatrix.needsUpdate = true
-
-  // травинки уже в самом коридоре: под ногами тоже должно быть видно, что
-  // поле бежит, а не стоит вместе с камерой
-  const N_TUFT = 420
   const tuftGeo = new THREE.ConeGeometry(0.16, 0.55, 4)
   tuftGeo.translate(0, 0.27, 0)
+  const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, N_TREE)
+  const crowns = new THREE.InstancedMesh(crownGeo, crownMat, N_TREE)
+  const bushes = new THREE.InstancedMesh(bushGeo, bushMat, N_BUSH)
   const tufts = new THREE.InstancedMesh(tuftGeo, tuftMat, N_TUFT)
-  for (let i = 0; i < N_TUFT; i += 1) {
-    const x = DECOR_X0 + rng() * (DECOR_X1 - DECOR_X0)
-    const z = -(CORRIDOR_HALF_M + 1.5) + rng() * (CORRIDOR_HALF_M + 1.5) * 2
-    place(tufts, i, x, z, 0.7 + rng() * 0.9, 0.7 + rng() * 0.9, rng() * Math.PI)
-  }
-  tufts.instanceMatrix.needsUpdate = true
-
   group.add(trunks, crowns, bushes, tufts)
-  return { obj: group, mats: { trunk: trunkMat, crown: crownMat, bush: bushMat, tuft: tuftMat } }
+
+  /** Раскладка: у кого не нашлось свободного места — тот просто не посажен,
+   *  зато ни одно дерево не стоит на тропе. Массы от этого не дорожают:
+   *  вызовов отрисовки всё равно четыре. */
+  const lay = (pts: PathPoint[]) => {
+    const rng = makeRng(20260517)
+
+    let n = 0
+    for (let i = 0; i < N_TREE; i += 1) {
+      const at = spot(rng, pts, 4, CLEAR_TREE)
+      if (!at) continue
+      const s = 0.8 + rng() * 1.5
+      // рост и поворот — ОДНИ на ствол и крону: иначе ствол и крона разъехались
+      // бы разными масштабами, и дерево распалось бы на две половинки
+      const sy = 0.75 + rng() * 0.55
+      const ry = rng() * Math.PI
+      place(trunks, n, at.x, at.y, s, sy, ry)
+      place(crowns, n, at.x, at.y, s, sy, ry)
+      n += 1
+    }
+    trunks.count = n
+    crowns.count = n
+
+    let b = 0
+    for (let i = 0; i < N_BUSH; i += 1) {
+      const at = spot(rng, pts, 2.5, CLEAR_BUSH)
+      if (!at) continue
+      place(bushes, b, at.x, at.y, 0.7 + rng() * 1.1, 0.6 + rng() * 0.6, rng() * Math.PI)
+      b += 1
+    }
+    bushes.count = b
+
+    // травинки сажают ВДОЛЬ тропы, а не по всему полю: два-шесть метров в
+    // стороне от бегущих — самый сильный признак скорости, а в самом следе
+    // трава только торчала бы сквозь модель
+    let t = 0
+    for (let i = 0; i < N_TUFT; i += 1) {
+      let at: { x: number; y: number } | null = null
+      if (pts.length > 0) {
+        const a = pts[Math.floor(rng() * pts.length)]
+        const ang = rng() * Math.PI * 2
+        const d = 1.3 + rng() * 5
+        const cand = { x: a[0] + Math.cos(ang) * d, y: a[1] + Math.sin(ang) * d }
+        if (clearOfPath(pts, cand.x, cand.y, CLEAR_TUFT)) at = cand
+      } else {
+        at = spot(rng, pts, 0, CLEAR_TUFT)
+      }
+      if (!at) continue
+      place(tufts, t, at.x, at.y, 0.7 + rng() * 0.9, 0.7 + rng() * 0.9, rng() * Math.PI)
+      t += 1
+    }
+    tufts.count = t
+
+    trunks.instanceMatrix.needsUpdate = true
+    crowns.instanceMatrix.needsUpdate = true
+    bushes.instanceMatrix.needsUpdate = true
+    tufts.instanceMatrix.needsUpdate = true
+  }
+  lay(path)
+
+  return { obj: group, mats, lay }
 }
 
 /** Сетка поля: свои линии вместо GridHelper — у того цвета зашиты в вершины
@@ -452,14 +503,17 @@ export type Arena3DProps = {
   runKey: number
   /** день или ночь: меняется на месте, без перестройки сцены */
   night: boolean
+  /** тропа этого погоня: по ней раскладывают поле, чтобы ни одно дерево не
+   *  встало на дорогу бегущим */
+  path: PathPoint[]
   /** что наложить поверх сцены (итог погони); в 2D-виде то же самое лежит
    *  внутри той же .stage — иначе плашка уезжала бы под картинку */
   children?: React.ReactNode
 }
 
-export function Arena3D({ frameSink, pilot, tagRadius, runKey, night, children }: Arena3DProps) {
+export function Arena3D({ frameSink, pilot, tagRadius, runKey, night, path, children }: Arena3DProps) {
   const wrapRef = useRef<HTMLDivElement>(null)
-  const apiRef = useRef<{ setPilot: (p: Pilot) => void; reset: () => void; setNight: (n: boolean) => void } | null>(null)
+  const apiRef = useRef<{ setPilot: (p: Pilot) => void; reset: () => void; setNight: (n: boolean) => void; setField: (pts: PathPoint[]) => void } | null>(null)
   // радиус осаливания читаем через ref: сцена строится один раз на монтаж,
   // а prop приходит из сценария и пересобирать из-за него весь мир незачем
   const tagRef = useRef(tagRadius)
@@ -502,7 +556,7 @@ export function Arena3D({ frameSink, pilot, tagRadius, runKey, night, children }
     grid.line.position.y = 0.02
     scene.add(grid.line)
 
-    const scenery = makeScenery()
+    const scenery = makeScenery(path)
     scene.add(scenery.obj)
 
     const sky = new THREE.Group()
@@ -639,6 +693,7 @@ export function Arena3D({ frameSink, pilot, tagRadius, runKey, night, children }
         setNight(nightRef.current)
       },
       setNight,
+      setField: (pts) => scenery.lay(pts),
     }
 
     const resize = () => {
@@ -829,6 +884,12 @@ export function Arena3D({ frameSink, pilot, tagRadius, runKey, night, children }
   useEffect(() => {
     apiRef.current?.setNight(night)
   }, [night])
+
+  // тропа меняется с каждым пуском — вместе с ней поле перекладывают: деревья
+  // и кусты уходят в стороны, чтобы никто не бежал сквозь ствол
+  useEffect(() => {
+    apiRef.current?.setField(path)
+  }, [path])
 
   return (
     <div className="stage" ref={wrapRef}>
