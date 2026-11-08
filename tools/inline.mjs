@@ -2,7 +2,6 @@
 // двойным кликом по file:// без сервера: внешние ES-модули браузер по file://
 // блокирует по CORS, а инлайновый <script type="module"> выполняется.
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs'
-
 const dist = new URL('../dist/', import.meta.url)
 const htmlPath = new URL('index.html', dist)
 let html = readFileSync(htmlPath, 'utf8')
@@ -43,3 +42,10 @@ if (loose) {
   process.exit(1)
 }
 console.log('dist/index.html собран в один файл:', (html.length / 1024).toFixed(0) + ' КБ')
+
+// Копия того же файла в корень репозитория: `dist/` в .gitignore, поэтому без
+// неё клон репозитория не содержит чего открыть двойным кликом — обещание
+// README «нужен только один HTML-файл» держится именно на этом файле.
+const ready = new URL('../game.html', import.meta.url)
+writeFileSync(ready, html)
+console.log('game.html в корне обновлён: тот же файл, что и dist/index.html')
