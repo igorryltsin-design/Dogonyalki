@@ -25,7 +25,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install --no-audit --no-fund
+      # npm ci, а не npm install: сборка на Actions обязана выходить той же,
+      # что на машине автора, — для этого package-lock.json лежит в репозитории.
+      - run: npm ci --no-audit --no-fund
       - run: npm run build:offline
       - name: Только сама игра — один файл
         run: |
