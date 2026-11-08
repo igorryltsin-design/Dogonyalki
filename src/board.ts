@@ -10,7 +10,7 @@
 
 import { localRun } from './localSim'
 import { chaseVariant } from './scenarios'
-import type { EyeConfig, Pilot } from './types'
+import type { ChaseScenario, EyeConfig, Pilot } from './types'
 import { yieldToUi } from './yield'
 
 export type ContestResult = {
@@ -28,6 +28,8 @@ export type ContestOpts = {
   predict?: (img: number[][]) => { az: number; el: number }
   onRun?: (done: number, total: number) => void
   shouldStop?: () => boolean
+  /** свой сценарий для i-й погони (нарисованный путь); по умолчанию — chaseVariant */
+  scenario?: (i: number) => ChaseScenario
 }
 
 export async function runContest(pilot: Pilot, eye: EyeConfig, opts?: ContestOpts): Promise<ContestResult> {
@@ -38,7 +40,7 @@ export async function runContest(pilot: Pilot, eye: EyeConfig, opts?: ContestOpt
   let errFrames = 0
   for (let i = 0; i < runs; i += 1) {
     if (opts?.shouldStop?.()) break
-    const sc = chaseVariant(i, eye)
+    const sc = opts?.scenario ? opts.scenario(i) : chaseVariant(i, eye)
     let hit = false
     let errRun = 0
     let nRun = 0

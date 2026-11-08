@@ -1,0 +1,47 @@
+# Собирает однофайловую игру (npm run build:offline → dist/index.html) и
+# выкладывает её на GitHub Pages: ссылка «▶ Играть» в README ведёт сюда.
+# Запускается при каждой отправке в основную ветку и вручную (Actions → Run).
+name: Игра на GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - run: npm run build:offline
+      - name: Только сама игра — один файл
+        run: |
+          mkdir site
+          cp dist/index.html site/index.html
+          touch site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

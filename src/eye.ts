@@ -284,3 +284,35 @@ export function decodeImage(img: number[][], eye: EyeConfig, n = EYE_N) {
     flux,
   }
 }
+
+/** Особые глаза для опытов: блик на линзе и крупные клеточки.
+ *  Блик — яркое пятно в одном и том же месте кадра, как капля или солнечный
+ *  зайчик на стекле: Шустрик двигается, а блик стоит. Крупные клеточки —
+ *  кадр усредняется квадратами cells×cells: так выглядит глаз, у которого
+ *  клеточек меньше. Обе правки — после шума: шум живёт в каждом клеточке. */
+export function applyEyeExtras(img: number[][], eye: EyeConfig): number[][] {
+  let out = img
+  if (eye.glare !== undefined) {
+    const halfFov = eyeHalfFov(eye)
+    const spot = rasterEye(eye.glare * halfFov * 0.8, 0, 0.05, eye)
+    out = out.map((row, j) => row.map((v, i) => Math.min(1.5, v + spot[j][i] * 0.9)))
+  }
+  if (eye.cells && eye.cells < EYE_N) {
+    const k = Math.max(1, Math.round(EYE_N / eye.cells))
+    const pooled = out.map((row) => row.slice())
+    for (let by = 0; by < EYE_N; by += k)
+      for (let bx = 0; bx < EYE_N; bx += k) {
+        let sum = 0
+        let n = 0
+        for (let y = by; y < Math.min(EYE_N, by + k); y += 1)
+          for (let x = bx; x < Math.min(EYE_N, bx + k); x += 1) {
+            sum += out[y][x]
+            n += 1
+          }
+        const m = sum / n
+        for (let y = by; y < Math.min(EYE_N, by + k); y += 1) for (let x = bx; x < Math.min(EYE_N, bx + k); x += 1) pooled[y][x] = m
+      }
+    out = pooled
+  }
+  return out
+}

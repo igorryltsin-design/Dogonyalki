@@ -346,7 +346,6 @@ table.board td:last-child { border-radius: 0 12px 12px 0; }
 .cards-strip canvas { border-radius: 10px; border: 2px solid var(--line); flex: none; }
 
 .event-log { font-size: 15px; color: var(--ink-soft); max-height: 84px; overflow-y: auto; }
-.footer { padding: 10px 20px 24px; text-align: center; color: var(--ink-soft); font-size: 13px; }
 
 /* ── телефон: всё, что выше, перебиваем здесь ──────────────────────── */
 /* этот блок живёт в самом конце файла: мобильные правила спорят с
@@ -405,7 +404,7 @@ table.board td:last-child { border-radius: 0 12px 12px 0; }
   canvas.viewport--seeker { width: min(220px, 60vw); height: min(220px, 60vw); }
   /* цифры погони — одной строкой, иначе ряд из четырёх плиток складывается в
      две и уползает за край экрана. Полоска времени уезжает над ними тонкой
-     линией: она нужна на «Пуск ×10», но свои 220 пикселей в строке она
+     линией: она нужна на «▶ 10 погонь», но свои 220 пикселей в строке она
      выламывала перенос. */
   .hud-row { gap: 6px; }
   .hud-row .progress { flex: 1 1 100%; order: -1; margin: 0; height: 10px; }
@@ -413,3 +412,756 @@ table.board td:last-child { border-radius: 0 12px 12px 0; }
   .stat--sm b { font-size: 17px; }
   .stat--sm span { font-size: 11px; }
 }
+
+/* ── турнир ───────────────────────────────────────────────────────── */
+.tour__hero { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .tour__hero { grid-template-columns: 1fr; } }
+.lineup { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lineup li { display: grid; grid-template-columns: 16px auto; column-gap: 8px; align-items: center; font-size: 15px; }
+.lineup li span { grid-column: 2; color: var(--ink-soft); font-size: 13px; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 4px; border: 2px solid transparent; vertical-align: -1px; }
+.tour__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .tour__grid { grid-template-columns: 1fr; } }
+.facts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; }
+.facts li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: #eef7f0; border: 2px solid #cfe7d6; font-size: 15px; line-height: 1.35; }
+.facts li.is-honest { background: #eef2fb; border-color: #d3ddf3; }
+.facts li span { font-size: 20px; line-height: 1; }
+.chart { position: relative; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart--radar svg { max-width: 420px; margin: 0 auto; }
+/* карточка «Сколько нужно подсказок?» — во всю ширину страницы: без предела
+   график растягивался на 1900 px, и подписи становились огромными */
+.chart--examples svg { max-width: 760px; margin: 0 auto; }
+.chart__x { text-align: right; font-size: 13px; color: var(--ink-soft); }
+.grid-line { stroke: var(--line); stroke-width: 1; }
+.axis-label { font-size: 12px; fill: var(--ink-soft); }
+.radar__ring { fill: none; stroke: var(--line); stroke-width: 1; }
+.radar__spoke { stroke: var(--line); stroke-width: 1; }
+.radar__label { font-size: 16px; font-weight: 700; fill: var(--ink); cursor: help; }
+.hbar { display: grid; grid-template-columns: minmax(120px, 34%) 1fr; gap: 10px; align-items: center; padding: 5px 0; }
+.hbar__name { font-size: 15px; display: flex; gap: 8px; align-items: center; }
+.hbar__track { position: relative; height: 22px; background: #f1eee5; border-radius: 6px; display: flex; align-items: center; }
+.hbar__fill { height: 100%; border-radius: 0 6px 6px 0; transition: width 0.8s cubic-bezier(.2,.8,.2,1); }
+.hbar__fill--ref { background: repeating-linear-gradient(135deg, transparent 0 5px, rgba(184,134,11,.35) 5px 8px); border: 2px dashed; box-sizing: border-box; }
+.hbar__val { margin-left: 8px; font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.hbar--sm { grid-template-columns: 92px 1fr; padding: 3px 0; }
+.hbar--sm .hbar__name { font-size: 13px; color: var(--ink-soft); }
+.hbar--sm .hbar__track { height: 16px; }
+.cost-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.cost { position: relative; }
+.cost h4 { margin: 0 0 4px; font-size: 15px; }
+.cost__note { margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
+.chips--legend { margin: 6px 0 4px; }
+.legend-chip { display: inline-flex; gap: 6px; align-items: center; }
+.chips button.legend-chip.is-on { background: var(--card); color: var(--ink); border-color: var(--ink-soft); }
+.tip { position: absolute; z-index: 20; pointer-events: none; transform: translate(12px, -110%); background: var(--ink); color: #fff; padding: 6px 10px; border-radius: 10px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; max-width: 260px; box-shadow: var(--shadow); }
+.tip b { font-size: 14px; }
+.table-scroll { overflow-x: auto; }
+.tour-table { border-collapse: collapse; font-size: 14px; min-width: 760px; margin-top: 10px; }
+.tour-table th, .tour-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.tour-table th:first-child, .tour-table td:first-child { text-align: left; }
+.tour-table th { color: var(--ink-soft); font-weight: 600; }
+details.card summary { cursor: pointer; }
+.chart--radar svg { max-width: 520px; }
+.chart__foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+.legend-row { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--ink-soft); }
+.legend-row span { display: inline-flex; gap: 5px; align-items: center; }
+
+/* ── арена: бойцы и гонка с призраком ─────────────────────────────── */
+.chips button.fighter { display: inline-flex; gap: 6px; align-items: center; }
+.chips--rival { align-items: center; }
+.chips__cap { font-size: 14px; color: var(--ink-soft); font-weight: 700; margin-right: 2px; }
+.chips--rival button { padding: 5px 11px; font-size: 14px; }
+.flash--race { display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 22px; text-align: center; animation: pop 0.45s cubic-bezier(.2,1.6,.4,1); }
+.flash--race small { font-size: clamp(13px, 1.6vw, 16px); font-weight: 700; opacity: 0.92; }
+@keyframes pop { from { transform: translateX(-50%) scale(0.6); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+.flash.flash--race { font-size: clamp(17px, 2.4vw, 26px); padding: 8px 20px; }
+
+/* ── узкие экраны: всё видно без смахивания ───────────────────────── */
+.lbl-short { display: none; }
+@media (max-width: 900px) {
+  /* шапка в две строки: название и ВСЕ вкладки сверху, ручка глаза под ними.
+     Раньше вкладки смахивались пальцем, и на телефоне была видна одна «Арена» */
+  .topbar { flex-wrap: wrap; row-gap: 6px; }
+  .tabs { flex: 1 1 auto; flex-wrap: nowrap; overflow: visible; gap: 4px; }
+  .tabs button { padding: 6px 9px; font-size: 14px; }
+  .eyebar { flex: 1 1 100%; justify-content: space-between; }
+  /* чипы бойцов переносятся, а не уезжают за край: ребёнок не догадается,
+     что строку надо смахнуть */
+  .chips { flex-wrap: wrap; overflow: visible; gap: 6px; padding-bottom: 0; }
+  .chips button { font-size: 14px; padding: 5px 10px; }
+  .lbl-full { display: none; }
+  .lbl-short { display: inline; }
+  .chips--rival button { padding: 4px 9px; font-size: 13px; }
+  .hud-line .big--sm { padding: 8px 12px; font-size: 15px; border-radius: 12px; }
+  .flash.flash--race { font-size: 16px; padding: 6px 14px; max-width: calc(100% - 20px); }
+  .flash--race small { font-size: 12px; }
+  /* турнир: подписи полос — над полосой, а не сбоку, иначе полоса в
+     две буквы шириной */
+  .hbar { grid-template-columns: 1fr; gap: 3px; padding: 6px 0; }
+  .hbar--sm { grid-template-columns: 86px 1fr; gap: 6px; }
+  .lineup li { font-size: 14px; }
+  .facts { grid-template-columns: 1fr; }
+  .tour .card h2 { font-size: 20px; }
+}
+@media (max-width: 380px) {
+  .topbar__title { font-size: 15px; }
+  .tabs button { padding: 5px 7px; font-size: 13px; }
+}
+@media (max-width: 900px) {
+  /* в одну строку — только кнопки «Пуск» на панели арены учителя; в окнах
+     опроса, опытов и команд кнопки переносятся, иначе уходят за край */
+  .hud-line { flex-wrap: wrap; }
+  .arena-panel > .hud-line:not(.mode-line) { flex-wrap: nowrap; }
+  .arena-panel > .hud-line .big--sm { flex: 1 1 auto; padding: 8px 6px; font-size: 14px; white-space: nowrap; }
+}
+@media (max-width: 900px) {
+  /* четыре цифры погони — ровной сеткой в одну строку, полоска времени над ними */
+  .hud-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .hud-row .progress { grid-column: 1 / -1; }
+  .hud-row .stat--sm { min-width: 0; }
+  .hud-row .stat--sm span { display: block; line-height: 1.15; }
+}
+@media (max-width: 900px) {
+  .radar__label { font-size: 21px; }
+  .chart--radar svg { max-width: none; }
+}
+
+/* ── нарисуй путь ─────────────────────────────────────────────────── */
+.big--play { background: #d9622b; }
+.big--play2 { background: #8a4fc4; }
+.mode-line { margin-top: 8px; }
+@media (max-width: 900px) { .hud-line.mode-line { flex-wrap: wrap; } }
+.drawer-modal {
+  position: fixed; inset: 0; z-index: 50; background: rgba(30, 40, 25, 0.45);
+  display: flex; align-items: center; justify-content: center; padding: 12px;
+}
+.drawer {
+  width: min(1100px, 100%); max-height: 100%; overflow: auto;
+  background: var(--card); border-radius: 18px; border: 2px solid var(--line); box-shadow: var(--shadow);
+  padding: 14px; display: flex; flex-direction: column; gap: 10px;
+}
+.drawer__head { display: flex; flex-direction: column; gap: 2px; }
+.drawer__head b { font-size: 20px; color: var(--green-deep); }
+.drawer__canvas { width: 100%; border-radius: 12px; border: 2px solid var(--line); touch-action: none; cursor: crosshair; display: block; }
+.drawer__why { color: #a33b22; font-weight: 700; }
+.drawer__row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ── предскажи и проверь ──────────────────────────────────────────── */
+.poll {
+  width: min(720px, 100%); max-height: 100%; overflow: auto;
+  background: var(--card); border-radius: 18px; border: 2px solid var(--line); box-shadow: var(--shadow);
+  padding: 16px; display: flex; flex-direction: column; gap: 12px;
+}
+.poll__q { display: flex; flex-direction: column; gap: 4px; }
+.poll__q b { font-size: clamp(20px, 3.4vw, 30px); color: var(--green-deep); }
+.poll__opts { display: flex; flex-direction: column; gap: 8px; }
+.poll__row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--bg); border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px;
+}
+.poll__lbl { font-size: clamp(16px, 2.4vw, 22px); font-weight: 700; }
+.poll__count { display: flex; align-items: center; gap: 6px; flex: none; }
+.poll__count b { min-width: 38px; text-align: center; font-size: clamp(18px, 2.6vw, 26px); }
+.poll__plus, .poll__minus {
+  border: 2px solid var(--line); background: #fff; border-radius: 10px; cursor: pointer;
+  font-weight: 800; font-size: 18px; padding: 6px 10px; color: var(--green-deep);
+}
+.poll__minus { color: var(--ink-soft); }
+.poll__plus:active, .poll__minus:active { transform: scale(0.94); }
+.poll__note { display: block; }
+.poll__outcome { margin: 0; font-size: clamp(18px, 2.8vw, 26px); font-weight: 800; }
+.poll__bars { display: flex; flex-direction: column; gap: 8px; }
+.poll__opt {
+  position: relative; display: grid; grid-template-columns: minmax(96px, 1fr) auto auto;
+  align-items: center; gap: 8px; overflow: hidden;
+  border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px; background: var(--bg);
+}
+.poll__opt--right { border-color: var(--green); background: #eaf7ef; }
+.poll__fill { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(46, 158, 91, 0.18); }
+.poll__num { position: relative; font-size: 20px; font-weight: 800; }
+.poll__tag { position: relative; font-style: normal; font-size: 13px; font-weight: 800; color: var(--green-deep); }
+.poll__tally { margin: 0; color: var(--ink-soft); font-size: clamp(14px, 2vw, 17px); }
+@media (max-width: 560px) {
+  .poll__row { flex-direction: column; align-items: stretch; }
+  .poll__count { justify-content: space-between; }
+}
+
+/* ── лаборатория ──────────────────────────────────────────────────── */
+.lab h2 { margin: 0 0 4px; }
+.lab__held {
+  display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+  background: #f6f4ec; border: 2px solid var(--line); border-radius: 12px; padding: 8px 12px;
+}
+.lab__held .cap { color: var(--green-deep); font-weight: 800; }
+.lab__held-item { font-size: clamp(14px, 2vw, 17px); color: var(--ink-soft); }
+.lab__knobs { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.lab__knob {
+  background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.lab__knob--on { border-color: var(--green); box-shadow: var(--shadow); }
+.lab__knob-name { display: flex; align-items: center; gap: 8px; font-size: clamp(16px, 2.4vw, 21px); }
+.lab__flag {
+  font-style: normal; font-size: 13px; font-weight: 800; color: #fff; background: var(--green);
+  border-radius: 999px; padding: 2px 10px;
+}
+.lab__choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.lab__choices button {
+  border: 2px solid var(--line); background: #fff; border-radius: 12px; cursor: pointer;
+  font-size: clamp(15px, 2.2vw, 19px); font-weight: 700; padding: 8px 12px; color: var(--ink);
+}
+.lab__choices button.is-on { border-color: var(--green); background: #eaf7ef; color: var(--green-deep); }
+.lab__choices button:disabled { opacity: 0.55; cursor: default; }
+.lab__go { margin-top: 12px; }
+.lab__verdict {
+  margin: 10px 0 0; font-size: clamp(16px, 2.4vw, 21px);
+  background: #eaf7ef; border: 2px solid var(--green); border-radius: 12px; padding: 10px 12px;
+}
+.lab__empty { display: block; margin-top: 12px; }
+table.lab__table { width: 100%; border-collapse: separate; border-spacing: 0 6px; margin-top: 14px; }
+table.lab__table th { text-align: left; font-size: 14px; color: var(--ink-soft); padding: 2px 10px; }
+table.lab__table td {
+  background: #f6f4ec; border: 2px solid var(--line); padding: 8px 10px; font-size: clamp(15px, 2.2vw, 18px);
+}
+table.lab__table td:first-child { border-radius: 12px 0 0 12px; color: var(--ink-soft); }
+table.lab__table td:last-child { border-radius: 0 12px 12px 0; }
+table.lab__table tr.is-control td { background: #fffaf0; }
+.lab__what small { display: block; color: var(--ink-soft); font-size: 13px; }
+.lab__num { font-weight: 800; white-space: nowrap; }
+.lab__bar-cell { position: relative; min-width: 140px; }
+.lab__bar {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  height: 14px; border-radius: 8px; background: rgba(46, 158, 91, 0.35);
+}
+.lab__delta { position: relative; color: var(--ink-soft); font-size: 14px; }
+.lab__sums { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+.lab__sums p { margin: 0; color: var(--ink-soft); font-size: clamp(14px, 2vw, 17px); }
+.lab__warn { color: #a33b22; font-weight: 700; }
+@media (max-width: 640px) {
+  table.lab__table th:last-child, table.lab__table td.lab__bar-cell { display: none; }
+}
+
+/* ── соревнование команд ────────────────────────────────────────────── */
+.teams h2 { margin: 0 0 4px; }
+.teams__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-top: 12px; }
+.teams__card {
+  background: var(--card); border: 2px solid var(--line); border-radius: 16px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow);
+}
+.teams__card--empty { background: #f6f4ec; box-shadow: none; }
+.teams__name {
+  border: 2px solid var(--line); border-radius: 10px; padding: 6px 10px; font-size: clamp(16px, 2.2vw, 20px);
+  font-weight: 800; color: var(--ink); background: #fff;
+}
+.teams__thumb { display: flex; align-items: center; gap: 10px; }
+.teams__score { font-size: clamp(16px, 2.4vw, 21px); color: var(--green-deep); }
+.teams__score small { display: block; color: var(--ink-soft); font-size: 13px; font-weight: 400; }
+.teams__acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.teams__befly { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); font-size: 14px; }
+.teams__befly input { width: 84px; padding: 6px 8px; border: 2px solid var(--line); border-radius: 10px; font-size: 16px; }
+.teams__go { margin-top: 10px; }
+.teams__stage {
+  margin-top: 14px; background: #eaf7ef; border: 2px solid var(--green); border-radius: 16px; padding: 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.teams__stage b { font-size: clamp(18px, 3vw, 26px); color: var(--green-deep); }
+.teams__verdict { margin: 0; font-size: clamp(17px, 2.6vw, 23px); text-align: center; }
+table.teams__table { width: 100%; border-collapse: separate; border-spacing: 0 6px; margin-top: 14px; }
+table.teams__table th { text-align: left; font-size: 14px; color: var(--ink-soft); padding: 2px 10px; }
+table.teams__table td {
+  background: #f6f4ec; border: 2px solid var(--line); padding: 8px 10px; font-size: clamp(15px, 2.2vw, 18px);
+  vertical-align: middle;
+}
+table.teams__table td:first-child { border-radius: 12px 0 0 12px; font-size: 22px; }
+table.teams__table td:last-child { border-radius: 0 12px 12px 0; }
+table.teams__table tr.is-winner td { background: #fffaf0; }
+.teams__path-cell small { display: block; color: var(--ink-soft); font-size: 13px; }
+.teams__num { font-weight: 800; white-space: nowrap; }
+.teams__winner {
+  margin: 12px 0 0; font-size: clamp(16px, 2.4vw, 21px);
+  background: var(--card); border: 2px solid var(--green); border-radius: 12px; padding: 10px 12px;
+}
+canvas.thumb { display: block; border: 2px solid var(--line); border-radius: 10px; background: #f3f6ec; }
+@media (max-width: 640px) {
+  table.teams__table th:last-child, table.teams__table td:last-child { display: none; }
+  .teams__stage canvas.thumb { width: 100%; }
+}
+
+/* ── побудь мухой ─────────────────────────────────────────────────── */
+.befly__top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.befly__top h2 { margin: 0; }
+.befly__stage { display: flex; gap: 24px; align-items: center; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+.befly__eye { position: relative; }
+.befly__count, .befly__start {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+}
+.befly__count { font-size: 96px; font-weight: 900; color: #fff; text-shadow: 0 4px 18px rgba(0,0,0,.5); }
+.befly__pad { display: grid; grid-template-columns: repeat(2, 96px); grid-template-rows: 96px; gap: 12px; }
+.pad {
+  border: 2px solid var(--line); background: var(--card); border-radius: 16px; font-size: 28px; cursor: pointer;
+  touch-action: none; user-select: none; -webkit-user-select: none; box-shadow: var(--shadow);
+}
+.pad:active { background: #e3f0ff; }
+.pad--up { grid-column: 2; grid-row: 1; }
+.pad--left { grid-column: 1; grid-row: 1; }
+.pad--right { grid-column: 2; grid-row: 1; }
+.pad--down { grid-column: 2; grid-row: 3; }
+.befly__hud { justify-content: center; margin-top: 8px; }
+.befly__cmp { width: 100%; height: 240px; border-radius: 12px; border: 2px solid var(--line); display: block; margin: 8px 0; }
+@media (max-width: 900px) {
+  .befly__pad { grid-template-columns: repeat(2, 1fr); grid-template-rows: 72px; width: 100%; }
+  .befly__count { font-size: 72px; }
+}
+
+/* ── знакомство и подвкладки ──────────────────────────────────────── */
+.intro {
+  width: min(620px, 100%); background: var(--card); border-radius: 22px; border: 2px solid var(--line);
+  box-shadow: var(--shadow); padding: 22px clamp(16px, 4vw, 34px); text-align: center; max-height: 100%; overflow: auto;
+}
+.intro__pic { font-size: clamp(64px, 14vw, 96px); line-height: 1.1; animation: pic-in 0.45s cubic-bezier(.2,1.6,.4,1); }
+/* Картинка в потоке, по центру карточки: её нельзя двигать чужим `pop` —
+   тот сдвиг наполовину своей ширины нужен плашкам, которые висят на left:50%.
+   Иначе первые полсекунды муха висит у левого края окна, а в конце анимации
+   сдвиг снимается и она заметно перескакивает в центр. */
+@keyframes pic-in { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.intro h2 { color: var(--green-deep); margin: 6px 0 8px; font-size: clamp(20px, 3.4vw, 26px); }
+.intro p { margin: 0 0 10px; }
+.intro__steps { text-align: left; margin: 0 0 10px; padding-left: 22px; display: grid; gap: 6px; }
+.intro__dots { display: flex; gap: 8px; justify-content: center; margin: 8px 0 12px; }
+.intro__dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.intro__dots i.is-on { background: var(--green); }
+.intro__nav { justify-content: center; }
+/* «?» — такая же круглая кнопка, как ⚙ и 📋 рядом */
+.tabs__help { color: var(--green-deep); font-size: 18px; }
+.subtabs { display: flex; gap: 8px; padding: 10px clamp(8px, 1.6vw, 20px) 0; flex-wrap: wrap; }
+.subtabs button {
+  border: 2px solid var(--line); background: var(--card); color: var(--ink); padding: 8px 16px; border-radius: 999px;
+  font-size: 16px; font-weight: 700; cursor: pointer;
+}
+.subtabs button.is-on { background: #e7f4ea; border-color: var(--green); color: var(--green-deep); }
+@media (max-width: 900px) {
+  .subtabs button { font-size: 14px; padding: 6px 12px; }
+}
+
+/* ── мозг из коннектома ───────────────────────────────────────────── */
+.stage--brain { background: #0b1117; }
+.brain-legend li .ko {
+  border: 2px solid var(--line); background: var(--card); border-radius: 999px; padding: 1px 8px;
+  font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink);
+}
+.brain-legend li .ko.is-off { background: #a33b22; border-color: #a33b22; color: #fff; }
+.steer { display: grid; gap: 6px; margin: 6px 0; }
+.steer__row { display: grid; grid-template-columns: minmax(120px, 40%) 1fr auto; gap: 8px; align-items: center; font-size: 14px; }
+.steer__row em { font-style: normal; font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+.brain-legend li { grid-template-columns: 14px minmax(0, 1fr) 56px auto 44px; }
+.brain-legend b { font-size: 14px; line-height: 1.2; }
+/* желобок активности: общий .bar ниже по файлу перебивал его фон */
+.bar.bar--act { height: 12px; border-radius: 7px; background: #e6e3d6; overflow: hidden; min-width: 0; }
+
+/* ── шапка: звёзды, меню, погода ──────────────────────────────────── */
+.topbar__tools { display: flex; gap: 6px; align-items: center; }
+.stars-btn, .menu__btn {
+  border: 2px solid var(--line); background: #fff8dc; color: var(--ink); border-radius: 999px;
+  padding: 6px 12px; font-size: 16px; font-weight: 800; cursor: pointer; min-height: 40px;
+}
+.menu__btn { background: var(--card); width: 40px; padding: 0; font-size: 18px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+/* ⚙ в шрифтах рисуется мельче соседних значков — чуть крупнее, чтобы три кнопки были одного веса */
+.menu__btn[aria-label='Настройки'] { font-size: 22px; }
+.menu { position: relative; }
+.menu__pop {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; width: min(320px, 90vw);
+  background: var(--card); border: 2px solid var(--line); border-radius: 16px; box-shadow: var(--shadow);
+  padding: 10px; display: flex; flex-direction: column; gap: 8px;
+}
+.menu__row { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 15px; }
+.menu__row input[type='checkbox'] { width: 22px; height: 22px; accent-color: var(--green); }
+.menu__item { text-align: left; border: 0; background: #f4f1e8; border-radius: 10px; padding: 10px 12px; font-size: 15px; cursor: pointer; }
+.menu__item--warn { background: #fbe9e4; }
+.menu__confirm { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.eyebar__weather button { display: inline-flex; gap: 4px; align-items: center; }
+.eyebar__seg button { min-height: 40px; }
+.tabs__icon { font-size: 1.05em; }
+
+/* ── задания и поздравление ───────────────────────────────────────── */
+.missions {
+  width: min(560px, 100%); max-height: 100%; overflow: auto; background: var(--card); border-radius: 20px;
+  border: 2px solid var(--line); box-shadow: var(--shadow); padding: 18px;
+}
+.missions h2 { margin: 0 0 4px; color: var(--green-deep); }
+.missions ul { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 8px; }
+.missions li { display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; background: #f6f4ec; }
+.missions li.is-done { background: #fff6d6; }
+.missions li b { display: block; font-size: 16px; }
+.missions li small { color: var(--ink-soft); font-size: 13px; }
+.missions__icon { font-size: 28px; text-align: center; }
+.star-toast {
+  /* в левом нижнем углу: сверху по центру тост закрывал шапку и кнопки
+     сцены; справа внизу живёт «Урок по шагам» */
+  position: fixed; left: 16px; bottom: 16px; max-width: calc(100% - 32px); z-index: 70; display: flex; gap: 12px; align-items: center;
+  background: #fff6d6; border: 2px solid #e6c34a; border-radius: 18px; padding: 10px 18px; box-shadow: var(--shadow);
+  animation: toast-in 0.45s cubic-bezier(.2,1.6,.4,1); cursor: pointer;
+}
+@keyframes toast-in { from { transform: translateY(20px) scale(0.8); opacity: 0; } to { transform: none; opacity: 1; } }
+.star-toast > span:first-child { font-size: 34px; }
+.star-toast b { display: block; font-size: 17px; }
+.star-toast small { font-size: 14px; color: var(--ink-soft); }
+
+/* ── урок по шагам ────────────────────────────────────────────────── */
+.lesson {
+  position: fixed; right: 12px; bottom: 12px; z-index: 40; width: min(380px, calc(100% - 24px));
+  background: var(--card); border: 2px solid var(--blue); border-radius: 16px; box-shadow: var(--shadow); padding: 12px;
+}
+.lesson__top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.lesson__x { border: 0; background: transparent; font-size: 18px; cursor: pointer; }
+.lesson p { margin: 6px 0; font-size: 15px; }
+.lesson__ask { background: #eef3fb; border-radius: 10px; padding: 6px 8px; }
+
+/* ── листок для класса ────────────────────────────────────────────── */
+.worksheet { width: min(800px, 100%); max-height: 100%; overflow: auto; background: #fff; color: #111; border-radius: 12px; padding: 24px 28px; }
+.worksheet h1 { font-size: 22px; margin: 0 0 8px; }
+.worksheet h2 { font-size: 17px; margin: 16px 0 6px; }
+.worksheet table { width: 100%; border-collapse: collapse; }
+.worksheet th, .worksheet td { border: 1px solid #999; padding: 10px; height: 34px; text-align: left; font-size: 14px; }
+.worksheet__tools { display: flex; gap: 8px; justify-content: flex-end; }
+.worksheet__draw { margin-top: 12px; height: 180px; border: 2px dashed #999; border-radius: 10px; padding: 8px; color: #666; }
+
+/* ── отчёт урока ────────────────────────────────────────────────── */
+.report {
+  width: min(820px, 100%); max-height: 100%; overflow: auto; background: #fff;
+  color: #111; border-radius: 12px; padding: 24px 28px;
+}
+.report__tools { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.report h1 { font-size: 22px; margin: 10px 0 2px; }
+.report__when { margin: 0; color: #666; font-size: 14px; }
+.report__sec { margin-top: 16px; }
+.report__sec h2 { font-size: 17px; margin: 0 0 4px; }
+.report__sec ul { margin: 0; padding-left: 20px; }
+.report__sec li { font-size: 14px; line-height: 1.55; }
+.report__note { margin-top: 18px; padding-top: 8px; border-top: 1px solid #ccc; font-size: 13px; color: #555; }
+
+@media print {
+  body * { visibility: hidden; }
+  .worksheet, .worksheet *, .report, .report * { visibility: visible; }
+  .worksheet { position: absolute; left: 0; top: 0; width: 100%; max-height: none; overflow: visible; padding: 0; }
+  .report { position: absolute; left: 0; top: 0; width: 100%; max-height: none; overflow: visible; padding: 0; }
+  .worksheet__tools, .report__tools { display: none; }
+  .worksheet-modal { background: none; }
+}
+
+/* ── режим малышей: крупно, пальцем легко попасть ─────────────────── */
+.is-kid .chips button, .is-kid .big--sm { min-height: 44px; }
+.is-kid .tabs button { min-height: 44px; }
+.teacher-only { display: none; }
+html:not(.is-kid) .teacher-only { display: revert; }
+html:not(.is-kid) .kid-only { display: none; }
+
+/* ── проектор: всё крупнее для большого экрана в классе ───────────── */
+html.is-projector { font-size: 125%; }
+html.is-projector body { font-size: 22px; }
+@media (max-width: 900px) {
+  .topbar__tools { margin-left: auto; }
+  .eyebar__wname { display: none; }
+  .stars-btn { padding: 4px 10px; font-size: 14px; min-height: 36px; }
+  .menu__btn { width: 36px; min-height: 36px; }
+}
+
+/* ── арена малышей ────────────────────────────────────────────────── */
+.kid-panel { display: flex; flex-direction: column; gap: 8px; }
+.kid-pick { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.kid-pick button {
+  border: 3px solid var(--line); background: var(--card); border-radius: 16px; padding: 8px 16px;
+  font-size: 18px; font-weight: 800; cursor: pointer; min-height: 48px;
+}
+.kid-pick button.is-on { border-color: var(--green); background: #e7f4ea; }
+.kid-pick button span { font-size: 22px; }
+.kid-actions { flex-wrap: wrap; }
+.kid-go { font-size: 22px; padding: 12px 30px; min-height: 52px; }
+.big.is-on { box-shadow: inset 0 0 0 3px rgba(255,255,255,.7); }
+.kid-hud { display: flex; flex-direction: column; gap: 6px; }
+.kid-hud p { margin: 0; font-size: clamp(17px, 2.4vw, 22px); font-weight: 700; color: var(--green-deep); }
+@media (max-width: 900px) {
+  .kid-pick button { font-size: 16px; padding: 6px 12px; }
+  .kid-go { font-size: 20px; padding: 10px 22px; }
+}
+
+/* ── мозг-схема для малышей ───────────────────────────────────────── */
+.stage--schema { background: #0f1720; display: flex; align-items: center; justify-content: center; }
+.schema { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 10px; }
+.schema svg { width: 100%; max-height: 100%; }
+.schema__edge { stroke: #8fb3d9; stroke-width: 4; fill: none; stroke-linecap: round; }
+.schema__spark { fill: #ffe27a; }
+.schema__label { fill: #dfe8f1; font-size: 15px; font-weight: 700; }
+.schema__node { cursor: pointer; transition: opacity 0.2s; }
+
+/* ── живой глаз ───────────────────────────────────────────────────── */
+.eye-row { align-items: flex-start; }
+/* поле не шире 620: на Full HD оно растягивалось на полэкрана в высоту */
+.field-card { flex: 1 1 360px; max-width: 620px; }
+.field-drag { width: 100%; display: block; border-radius: 12px; border: 2px solid var(--line); touch-action: none; cursor: grab; }
+.eye-verdict { font-weight: 800; font-size: 17px; margin: 6px 0 0; }
+.eye-verdict.is-yes { color: var(--green-deep); }
+.eye-verdict.is-no { color: #a33b22; }
+.linklike { border: 0; background: none; color: var(--blue); text-decoration: underline; cursor: pointer; font-size: inherit; margin-left: 6px; }
+.befly__levels { margin-top: 6px; }
+
+/* ── пьедестал ────────────────────────────────────────────────────── */
+.tour__kidhero h2 { margin: 0 0 6px; }
+.tour__cast { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.tour__actor { display: inline-flex; gap: 6px; align-items: center; background: #f4f1e8; border-radius: 999px; padding: 6px 14px; font-weight: 700; }
+.tour__actor span { font-size: 24px; }
+.podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .podium { grid-template-columns: 1fr; } }
+.podium__nom h3 { font-size: 19px; }
+.podium__nom ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.podium__nom li { display: grid; grid-template-columns: 34px 1fr; gap: 2px 8px; align-items: center; padding: 8px 10px; border-radius: 12px; background: #f6f4ec; }
+.podium__nom li.is-fly { background: #e7f4ea; box-shadow: inset 0 0 0 2px var(--green); }
+.podium__medal { font-size: 26px; grid-row: span 2; text-align: center; }
+.podium__who { font-weight: 800; font-size: 17px; }
+.podium__what { color: var(--ink-soft); font-size: 14px; }
+.tour__moral { font-size: 18px; font-weight: 700; color: var(--green-deep); }
+@media (max-width: 900px) {
+  .topbar { row-gap: 6px; }
+  .topbar__title { order: 1; }
+  .topbar__tools { order: 2; margin-left: auto; }
+  .tabs { order: 3; flex: 1 1 100%; }
+  .tabs button { flex: 1 1 0; justify-content: center; padding: 6px 4px; }
+  .eyebar { order: 4; flex: 1 1 100%; flex-wrap: nowrap; gap: 6px; padding: 4px 6px; }
+  .eyebar__seg button { padding: 6px 8px; font-size: 13px; min-height: 36px; white-space: nowrap; }
+  .eyebar__weather { margin-left: auto; }
+}
+@media (max-width: 380px) {
+  .eyebar__seg button { padding: 6px 6px; font-size: 12px; }
+}
+@media (max-width: 900px) {
+  .eye-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .eye-row > .card { padding: 8px; min-width: 0; }
+  .eye-row > .field-card { grid-column: 1 / -1; order: 3; }
+  .eye-row h3 { font-size: 15px; }
+  .eye-verdict { font-size: 14px; }
+}
+.stage.stage--schema { height: auto; aspect-ratio: 780 / 320; min-height: 0; }
+@media (min-width: 901px) { .stage.stage--schema { height: clamp(320px, 70dvh, 720px); aspect-ratio: auto; } }
+@media (max-width: 900px) {
+  .brain-controls .hud-line { flex-wrap: wrap; }
+  .stage-wrap .overlay--bl.pursuit-mini--after { order: 1; }
+}
+.kid-hud .kid-hud__how { font-size: clamp(15px, 2vw, 18px); color: var(--ink-soft); font-weight: 600; }
+.worksheet__tools { flex-wrap: wrap; }
+/* «Опыты» и «Команды»: ручки глаза и погоды на месте, но невидимы и не
+   нажимаются, поверх — надпись. Блок того же размера — шапка не прыгает */
+.eyebar__body { display: contents; }
+.eyebar--locked { position: relative; }
+.eyebar--locked .eyebar__body > * { visibility: hidden; }
+.eyebar__lock {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 0 12px; color: var(--ink-soft); font-size: 15px; font-weight: 600; line-height: 1.2;
+}
+@media (max-width: 600px) { .eyebar__lock { font-size: 13px; padding: 0 8px; } }
+/* невысокий экран ноутбука (768–900 px): окошко погони на «Мозге» ниже и без
+   подписи, иначе оно наезжало на панель с кнопками сверху */
+@media (min-width: 901px) and (max-height: 900px) {
+  .pursuit-mini canvas { height: clamp(80px, 14dvh, 120px); }
+  .pursuit-mini .hint { display: none; }
+}
+/* схема мозга на широком экране: три колонки вместо наплыва — кнопки и
+   погоня слева, схема в центре, список справа; иначе панели закрывали кружки */
+@media (min-width: 901px) {
+  .stage-wrap--schema {
+    display: grid;
+    grid-template-columns: minmax(250px, 320px) minmax(0, 1fr) minmax(290px, 380px);
+    grid-template-rows: auto 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  .stage-wrap--schema > .overlay { position: static; max-width: none; width: auto; }
+  .stage-wrap--schema > .brain-controls { grid-column: 1; grid-row: 1; }
+  .stage-wrap--schema > .pursuit-mini { grid-column: 1; grid-row: 2; }
+  .stage-wrap--schema > .pursuit-mini canvas { width: 100%; }
+  .stage-wrap--schema > .stage { grid-column: 2; grid-row: 1 / 3; height: auto; aspect-ratio: auto; min-height: 340px; align-self: stretch; }
+  .stage-wrap--schema > .overlay--side { grid-column: 3; grid-row: 1 / 3; max-height: none; }
+}
+/* меню ⚙ — фиксированно под кнопкой; координаты считает TopMenu */
+.menu__pop { position: fixed; right: auto; width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - 80px); overflow: auto; }
+/* лента миниатюр прокручивается сама и не должна распирать карточку:
+   иначе на узкой раскладке карточка становилась шире экрана */
+.cards-strip { width: 0; min-width: 100%; }
+/* узкий телефон (до 480 px): у учителя градусы глаза прячутся, кнопки «Пуск»
+   переносятся — иначе страница раскладывалась шире экрана и ужималась */
+@media (max-width: 480px) {
+  .eyebar__deg { display: none; }
+  .arena-panel > .hud-line:not(.mode-line) { flex-wrap: wrap; }
+  .arena-panel > .hud-line .big--sm { flex: 1 1 40%; }
+}
+/* средние экраны (901–1200 px): панель арены над сценой, а не поверх неё —
+   иначе она занимала почти половину сцены и прятала муху с Шустриком */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .stage-wrap > .kid-panel, .stage-wrap > .arena-panel { position: static; order: -1; max-width: none; }
+}
+@media (min-width: 901px) and (max-width: 1200px) {
+  /* кадр глаза — в нижний угол сцены: верхний теперь занят панелью */
+  .stage-wrap > .overlay--tr.eye-inset { top: auto; bottom: 16px; }
+}
+
+/* ── опыты: почини муху, эволюция, собери глаз, роботы ────────────── */
+.exp h2 { margin: 0 0 6px; }
+.exp h3 { margin: 12px 0 6px; font-size: 17px; }
+.exp__choices button { font-size: 16px; padding: 8px 14px; min-height: 44px; }
+/* испробованная починка: кнопка гаснет, но остаётся с результатом —
+   класс видит, какие догадки уже отпали и что они дали */
+.exp__choices button.is-tried { opacity: 1; background: #f8e9e4; border-color: #e3b5a6; color: #7a3a26; }
+.exp__tag { display: inline-block; margin-left: 8px; font-size: 13px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.7); }
+.exp__win { display: flex; flex-direction: column; gap: 4px; background: #e7f4ea; border: 2px solid var(--green); border-radius: 14px; padding: 10px 14px; margin: 10px 0; }
+.exp__win b { font-size: 18px; color: var(--green-deep); }
+.exp__log { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 6px; }
+.exp__log li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; background: #f6f4ec; border-radius: 10px; padding: 8px 12px; }
+.exp__log b { white-space: nowrap; }
+.exp__log b.is-bad { color: #a33b22; }
+.exp__note { margin-top: 12px; }
+.exp__result { font-size: 17px; }
+.exp__table { border-collapse: collapse; margin-top: 10px; width: 100%; max-width: 560px; }
+.exp__table th, .exp__table td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: center; }
+.exp__table td:first-child, .exp__table th:first-child { text-align: left; }
+.evo__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin: 12px 0; }
+.evo__bug { display: flex; flex-direction: column; align-items: center; gap: 2px; background: #f6f4ec; border: 2px solid transparent; border-radius: 14px; padding: 8px; text-align: center; }
+.evo__bug.is-best { border-color: var(--green); background: #e7f4ea; }
+.evo__bug.is-checking { border-color: #e7c15a; background: #fff6d8; animation: evo-pulse 1s ease-in-out infinite; }
+.evo__bug.is-checking .evo__face { animation: evo-fly 0.6s ease-in-out infinite alternate; }
+@keyframes evo-pulse { 50% { box-shadow: 0 0 0 4px rgba(231, 193, 90, 0.35); } }
+@keyframes evo-fly { to { transform: translateY(-4px) rotate(-8deg); } }
+@media (prefers-reduced-motion: reduce) { .evo__bug.is-checking, .evo__bug.is-checking .evo__face { animation: none; } }
+.evo__face { font-size: 28px; }
+.evo__score { font-size: 14px; color: var(--ink-soft); }
+.evo__bug small { color: var(--ink-soft); font-size: 12px; }
+.evo__chart { max-width: 640px; margin: 8px 0; }
+.evo__chart .evo__dot { stroke: #fff; stroke-width: 2; }
+.evo__chart svg { width: 100%; height: auto; display: block; }
+.buildeye { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+.buildeye__knobs { flex: 1 1 320px; min-width: 0; }
+.buildeye__preview { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.teach__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; margin: 10px 0; }
+.teach__card { border: 3px solid transparent; border-radius: 12px; padding: 2px; background: none; cursor: pointer; opacity: 0.55; }
+.teach__card.is-on { border-color: var(--green); opacity: 1; }
+.teach__card canvas { width: 100%; height: auto; display: block; }
+.robot-view { display: block; border-radius: 14px; border: 2px solid var(--line); max-width: 100%; }
+
+/* ── «Бойцы»: кто участвует в турнире ─────────────────────────────── */
+.fighters__try { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; margin-top: 8px; }
+.fighters__knobs { flex: 1 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.fighters__slider { display: flex; flex-direction: column; gap: 6px; font-size: 17px; }
+.fighters__slider input { width: 100%; max-width: 420px; }
+.fighters__says { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 16px; }
+.fighters__says li { display: flex; align-items: center; gap: 8px; }
+.swatch--ring { background: transparent !important; border: 3px solid; border-radius: 50%; }
+.fighters__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 12px; align-items: start; }
+.fighter p { margin: 6px 0; }
+.fighter__head { display: flex; align-items: center; gap: 12px; }
+.fighter__head h3 { margin: 0; }
+.fighter__head small { color: var(--ink-soft); }
+.fighter__icon { font-size: 40px; line-height: 1; }
+.fighter__facts { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 15px; }
+.fighter__facts th { text-align: left; font-weight: 700; color: var(--ink-soft); padding: 4px 10px 4px 0; vertical-align: top; white-space: nowrap; width: 1%; }
+.fighter__facts td { padding: 4px 0; border-bottom: 1px solid var(--line); }
+.fighter__det { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.layers { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 10px 0; }
+.layers__step { display: flex; align-items: center; gap: 4px; }
+.layers__arrow { color: var(--ink-soft); font-weight: 800; }
+.layers__box { display: flex; flex-direction: column; border-radius: 10px; padding: 6px 10px; border: 2px solid var(--line); background: #f6f4ec; line-height: 1.2; }
+.layers__box b { font-size: 14px; }
+.layers__box small { font-size: 12px; color: var(--ink-soft); }
+.layers__box--in { background: #e9f1fb; border-color: #b9d0ee; }
+.layers__box--out { background: #e7f4ea; border-color: #a9d8b8; }
+.wgrid-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.wgrid { image-rendering: pixelated; border: 1px solid var(--line); border-radius: 4px; }
+
+/* ── тренировка Огонька: значок в шапке и панель ──────────────────── */
+.train-pill { display: inline-flex; align-items: center; gap: 6px; border: 2px solid #e7c15a; background: #fff6d8; color: #6b4e00; font-weight: 800; border-radius: 999px; padding: 6px 12px; cursor: pointer; animation: evo-pulse 1.2s ease-in-out infinite; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .train-pill { animation: none; } }
+@media (max-width: 480px) { .train-pill .lbl-full { display: none; } }
+.trpanel__head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.trpanel__head h3 { margin: 0; }
+.trpanel__count { font-weight: 800; color: var(--green-deep); }
+.trpanel__minis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+@media (max-width: 760px) { .trpanel__minis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.trmini { position: relative; border-radius: 12px; overflow: hidden; border: 2px solid var(--line); }
+.trmini.is-hit { border-color: #8fd1a8; }
+.trmini.is-miss { border-color: #e3b5a6; }
+.trmini canvas { display: block; width: 100%; aspect-ratio: 4 / 3; }
+.trmini__tag { position: absolute; left: 6px; bottom: 4px; font-size: 12px; font-weight: 800; background: rgba(255,255,255,.85); border-radius: 999px; padding: 1px 7px; }
+.trmini.is-hit .trmini__tag { color: var(--green-deep); }
+.trmini.is-miss .trmini__tag { color: #a33b22; }
+.trpanel__row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.trpanel__chart { flex: 1 1 360px; min-width: 0; max-width: 640px; }
+.trchart { width: 100%; height: auto; display: block; }
+.trpanel__steer { flex: 1 1 260px; display: flex; flex-direction: column; gap: 8px; }
+.trknob { display: grid; grid-template-columns: minmax(110px, 1fr) 2fr auto; gap: 8px; align-items: center; font-size: 14px; }
+.trknob__bar { position: relative; height: 10px; border-radius: 999px; background: #eef1e8; }
+.trknob__base { position: absolute; top: -3px; width: 2px; height: 16px; background: #9aa39a; }
+.trknob__dot { position: absolute; top: -4px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; background: var(--green); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); transition: left 0.6s ease; }
+.trknob em { font-style: normal; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.trpanel__verdict { margin: 8px 0 0; font-weight: 800; font-size: 17px; color: var(--ink-soft); }
+.trpanel__verdict.is-good { color: #8a6400; }
+.trpanel__knobs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; }
+.trpanel__knobs .chips { margin: 0; }
+.predthumb { width: 76px; height: 76px; border-radius: 8px; image-rendering: pixelated; }
+.menu__btn.is-on { background: #e7f4ea; border-color: var(--green); }
+.menu__title { font-weight: 800; color: var(--ink-soft); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; padding: 2px 4px 4px; }
+
+/* ── гид: «вот эта кнопка» ────────────────────────────────────────── */
+.guide-glow { position: relative; z-index: 5; outline: 4px solid #f2b705 !important; outline-offset: 3px; border-radius: 14px; animation: guide-pulse 0.9s ease-in-out infinite; }
+@keyframes guide-pulse { 50% { outline-color: rgba(242, 183, 5, 0.35); outline-offset: 7px; } }
+@media (prefers-reduced-motion: reduce) { .guide-glow { animation: none; } }
+.learn__vs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 12px 24px; margin: 8px 0; }
+.learn__vs > div { background: #f6f4ec; border-radius: 14px; padding: 10px 14px; }
+.learn__vs p { margin: 4px 0 0; }
+
+.intro__map { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 8px; text-align: left; }
+.intro__map li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; background: #f6f4ec; border-radius: 12px; padding: 8px 10px; }
+.intro__mapicon { font-size: 26px; }
+@media (max-width: 480px) { .intro__map li { grid-template-columns: auto 1fr; } .intro__map li button { grid-column: 1 / -1; justify-self: start; } }
+
+/* пока открыт «Урок по шагам», у страницы запас снизу под его карточку */
+.has-lesson .page { padding-bottom: 300px; }
+
+/* «Опыты → Лаборатория»: кнопка опыта жила под всеми ручками, на ноутбуке —
+   на экран ниже. Теперь её строка прилипает к низу экрана, пока до неё не
+   долистали, и всегда под рукой */
+.lab__go { position: sticky; bottom: 0; z-index: 6; background: var(--bg); padding: 10px 0; margin: 0; box-shadow: 0 -10px 14px -10px rgba(0,0,0,.18); }
+/* на телефоне — сначала действие, потом объяснение: поле «потаскай»
+   сразу под двумя глазами, кнопка тренировки — до рассказа о способах */
+@media (max-width: 900px) {
+  .eye-row > .card:nth-child(n+4) { order: 4; }
+}
+@media (max-width: 600px) {
+  .has-lesson .lab__go { bottom: var(--lesson-h, 0px); }
+}
+
+/* ── турнир учителя: шапка в строку, итоги в один экран ───────────── */
+.tour__head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.tour__head-text { flex: 1 1 520px; min-width: 0; }
+.tour__head-text h2 { margin: 0 0 4px; }
+.tour__head-text p { margin: 0; }
+.tour__head-go { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.tour__summary { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (max-width: 1400px) { .tour__summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .tour__summary > :first-child { grid-column: 1 / -1; } }
+@media (max-width: 900px) { .tour__summary { grid-template-columns: 1fr; } }
+.facts--list { grid-template-columns: 1fr; gap: 6px; }
+.facts--list li { padding: 7px 10px; font-size: 14px; }
+@media (max-width: 1400px) and (min-width: 901px) { .tour__summary > :first-child .facts--list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tour__more > summary { cursor: pointer; padding: 2px 0; }
+.tour__more[open] > summary { margin-bottom: 10px; }
+.tour__summary .chart--radar svg { max-width: 360px; }
+
+/* ── «Учёба»: две колонки — два способа учиться ─────────────────── */
+.learn__cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+@media (max-width: 1200px) { .learn__cols { grid-template-columns: 1fr; } }
+.learn__col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.learn__head h2 { margin: 0 0 4px; font-size: 22px; }
+.learn__head p { margin: 0; }
+.learn__cards { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.subtabs--inline { padding: 10px 0 0; }
+.learn__col .trpanel__minis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 1700px) { .learn__col .trpanel__minis { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+/* в колонке «Учёбы» карточки робота мельче — сетка не уходит под экран */
+.learn__col .teach__grid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 4px; }
+@media (max-height: 820px) and (min-width: 1201px) { .learn__col .teach__grid { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); } }

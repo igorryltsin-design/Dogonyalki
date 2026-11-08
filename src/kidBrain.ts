@@ -94,6 +94,8 @@ export async function trainOnCards(
     seed?: number
     onProgress?: (p: TrainProgress) => void
     shouldStop?: () => boolean
+    /** пауза после каждого прохода, мс: чтобы учитель видел, как растёт график */
+    pauseMs?: number
   },
 ): Promise<KidNet> {
   const epochs = opts.epochs ?? 40
@@ -140,7 +142,8 @@ export async function trainOnCards(
     net.trained = true
     net.fingerprint = eyeFingerprint(opts.eye)
     opts.onProgress?.({ epoch: ep + 1, epochs, loss: loss / Math.max(seen, 1), holdLoss })
-    await yieldToUi()
+    if (opts.pauseMs) await new Promise((r) => setTimeout(r, opts.pauseMs))
+    else await yieldToUi()
   }
   return net
 }
@@ -175,7 +178,8 @@ function t1(c: CardRec, halfFov: number): number {
   return clampUnit(c.el / halfFov)
 }
 
-const NET_KEY = 'dogonjalki-kidnet-v1'
+// v2: сети, обученные до того, как Шустрик перестал летать, не подхватываем
+const NET_KEY = 'dogonjalki-kidnet-v2'
 
 export function saveNet(net: KidNet) {
   try {

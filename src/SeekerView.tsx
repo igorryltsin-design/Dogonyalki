@@ -58,11 +58,16 @@ export function SeekerView({
         return pad + ((a - axMin) / (axMax - axMin)) * (h - pad * 2)
       }
       let hot = { i: -1, j: -1, v: 0 }
+      let sum = 0
       for (let j = 0; j < n; j += 1) {
         for (let i = 0; i < n; i += 1) {
           const v = Number(image?.[j]?.[i] ?? 0)
+          sum += v
           if (v > hot.v) hot = { i, j, v }
-          const g = Math.round(16 + v * 230)
+          // мягкая гамма только для показа: далёкий Шустрик — тусклая клеточка,
+          // и без неё ребёнок видит просто чёрный квадрат. Мозгу достаётся
+          // тот же кадр, что и раньше.
+          const g = Math.round(16 + Math.pow(Math.max(0, v), 0.7) * 230)
           ctx.fillStyle = `rgb(${Math.round(g * 0.32)}, ${g}, ${Math.round(g * 0.66)})`
           const x0 = cx(i)
           const x1 = cx(i + 1)
@@ -70,6 +75,21 @@ export function SeekerView({
           const y1 = cy(j + 1)
           ctx.fillRect(x0 + 0.5, y0 + 0.5, Math.max(1, x1 - x0 - 1), Math.max(1, y1 - y0 - 1))
         }
+      }
+      // ореол вокруг самой яркой клеточки, если она правда выделяется на фоне
+      // (в ливень весь кадр шумит — тогда ореола нет, и это честно)
+      const mean = sum / (n * n)
+      const stand = hot.v - mean
+      if (hot.i >= 0 && stand > 0.08) {
+        const hx = (cx(hot.i) + cx(hot.i + 1)) / 2
+        const hy = (cy(hot.j) + cy(hot.j + 1)) / 2
+        const r = Math.max(cx(hot.i + 1) - cx(hot.i), cy(hot.j + 1) - cy(hot.j), 4) * 1.4 + w * 0.06
+        const a = Math.min(0.55, stand * 1.3)
+        const grad = ctx.createRadialGradient(hx, hy, 0, hx, hy, r)
+        grad.addColorStop(0, `rgba(140,255,200,${a})`)
+        grad.addColorStop(1, 'rgba(140,255,200,0)')
+        ctx.fillStyle = grad
+        ctx.fillRect(hx - r, hy - r, r * 2, r * 2)
       }
       ctx.strokeStyle = 'rgba(125,255,200,0.25)'
       ctx.lineWidth = 1

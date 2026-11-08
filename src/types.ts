@@ -11,13 +11,25 @@ export type EyeGrid = 'foveal' | 'camera'
  *  grid='camera' — обычная камера: ровные квадратики, узкое поле (12–14°).
  *  noisePct — помехи в глазу: доля яркости пятна, добавляемая к каждому
  *  клеточку как случайный шум (0 — чисто, 1 — пятно тонет в шуме). */
-export type EyeConfig = { grid: EyeGrid; fovDeg: number; noisePct: number }
+export type EyeConfig = {
+  grid: EyeGrid
+  fovDeg: number
+  noisePct: number
+  /** «Собери свой глаз»: сколько клеточек по стороне на самом деле (16, 8, 4) —
+   *  меньше 16 значит, что кадр собирается крупными кусками */
+  cells?: number
+  /** «Обмани робота»: блик на линзе — яркое пятно, всегда в одном месте кадра,
+   *  положение по азимуту в долях полуполя (−1 … 1) */
+  glare?: number
+}
 
 export const EYE_FLY: EyeConfig = { grid: 'foveal', fovDeg: 165, noisePct: 0 }
 export const EYE_CAMERA: EyeConfig = { grid: 'camera', fovDeg: 13, noisePct: 0 }
 
 /** Кто догоняет: муха (контур мозга), сеть ребёнка, «честный читер». */
-export type Pilot = 'fly' | 'kid' | 'cheater'
+/** Кто догоняет: муха (контур мозга), сеть ребёнка, «честный читер» и
+ *  сам ребёнок («Побудь мухой»: рулит руками, видя только кадр глаза). */
+export type Pilot = 'fly' | 'kid' | 'cheater' | 'manual'
 
 /** Манёвр убегающего Шустрика. */
 export type Maneuver = 'straight' | 'weave' | 'turn' | 'scissors' | 'dive' | 'combo'
@@ -46,6 +58,11 @@ export type ChaseScenario = {
   eye: EyeConfig
   /** зерно: один и тот же seed — один и тот же погон */
   seed: number
+  /** зеркальная погоня: старт и манёвр Шустрика — в другую сторону */
+  mirror?: boolean
+  /** нарисованный путь Шустрика: точки (x, y) движка, м. Есть путь — Шустрик
+   *  бежит по нему со скоростью v_runner, манёвр не действует */
+  path?: number[][]
 }
 
 export const DEFAULT_CHASE: ChaseScenario = {
@@ -75,6 +92,8 @@ export type BrainReadout = {
   lc10: number[]
   /** [тангаж, рыскание] в единицах −1…1 */
   out: [number, number]
+  /** активность всех нейронов схемы из коннектома (если просили записывать) */
+  circuit?: Float32Array
 }
 
 /** Кадр погоне — всё, что видит игра. Никаких «ракетных» слов: догоняющий и убегающий. */
@@ -123,9 +142,13 @@ export type TrainPointLite = {
   w: number[]
 }
 
-export const CARD_VERSION = 'dogonjalki-cards-v1'
+/** v2: карточки сняты после того, как Шустрик перестал летать */
+export const CARD_VERSION = 'dogonjalki-cards-v2'
 
 /** Отпечаток глаза для версионирования датасета: сменил глаз — карточки старые. */
 export function eyeFingerprint(e: EyeConfig): string {
-  return `${e.grid}:${e.fovDeg}:${e.noisePct}`
+  const base = `${e.grid}:${e.fovDeg}:${e.noisePct}`
+  const cells = e.cells && e.cells < 16 ? `:c${e.cells}` : ''
+  const glare = e.glare !== undefined ? `:g${e.glare}` : ''
+  return base + cells + glare
 }

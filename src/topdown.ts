@@ -1,4 +1,5 @@
 import { hashSeed } from './rng'
+import { isClear } from './field'
 import type { GameFrame } from './types'
 
 /** Вид сверху: одна и та же плоская схема погони для Арены и для экрана «Мозг».
@@ -41,11 +42,11 @@ export function stepTrail(tr: Trail, fr: GameFrame): void {
 const THEME = {
   day: {
     runnerTrail: 'rgba(120,110,100,0.5)', seekTrailAlpha: '88', beam: '#23301f', runner: '#d95a3d',
-    mark: 'rgba(74,128,84,0.35)', markStem: 'rgba(96,72,44,0.5)',
+    mark: 'rgba(74,128,84,0.35)', markStem: 'rgba(96,72,44,0.5)', grass: 'rgba(60,120,70,0.7)',
   },
   night: {
     runnerTrail: 'rgba(255,122,85,0.5)', seekTrailAlpha: 'cc', beam: '#7dffc8', runner: '#ff8a5a',
-    mark: 'rgba(120,200,170,0.22)', markStem: 'rgba(150,190,200,0.3)',
+    mark: 'rgba(120,200,170,0.22)', markStem: 'rgba(150,190,200,0.3)', grass: 'rgba(140,215,185,0.55)',
   },
 }
 
@@ -70,7 +71,7 @@ function fit(canvas: HTMLCanvasElement): { ctx: CanvasRenderingContext2D; w: num
 export function drawPursuit(
   canvas: HTMLCanvasElement,
   fr: GameFrame,
-  opts: { color: string; trail: Trail; night?: boolean },
+  opts: { color: string; trail: Trail; night?: boolean; path?: number[][] | null },
 ): void {
   const box = fit(canvas)
   if (!box) return
@@ -106,8 +107,26 @@ export function drawPursuit(
       if (seed % 5 === 0) continue // пусто: луг не вымазан точками сплошь
       const wx = ix * CELL + (seed % 17) / 17 * CELL * 0.7
       const wy = iy * CELL + ((seed >> 5) % 13) / 13 * CELL * 0.7
-      const [sx, sy] = px(wx, wy)
       const big = seed % 5 === 1 // дерево: крупнее и с тёмным ободком ствола
+      const [sx, sy] = px(wx, wy)
+      // на тропинках, где в игре бегают, деревья и кусты не растут — как и в
+      // объёме; там только травинки (сквозь траву бегать можно), иначе луг
+      // вокруг погони был бы пустым, и пропало бы ощущение скорости
+      if (!isClear(wx, wy, big ? 1.4 : 0.6)) {
+        ctx.strokeStyle = pal.grass
+        ctx.lineWidth = 2
+        ctx.lineCap = 'round'
+        ctx.beginPath()
+        const g = Math.max(6, k * 0.6)
+        ctx.moveTo(sx - g * 0.5, sy + g * 0.4)
+        ctx.lineTo(sx - g * 0.15, sy - g * 0.6)
+        ctx.moveTo(sx, sy + g * 0.4)
+        ctx.lineTo(sx + g * 0.1, sy - g * 0.8)
+        ctx.moveTo(sx + g * 0.5, sy + g * 0.4)
+        ctx.lineTo(sx + g * 0.3, sy - g * 0.5)
+        ctx.stroke()
+        continue
+      }
       const r = Math.max(2, k * (big ? 1.15 : 0.5))
       ctx.beginPath()
       ctx.arc(sx, sy, r, 0, Math.PI * 2)
@@ -133,6 +152,22 @@ export function drawPursuit(
       else ctx.lineTo(sx, sy)
     })
     ctx.stroke()
+  }
+  // нарисованный путь — пунктиром: куда Шустрик собирается бежать
+  if (opts.path && opts.path.length > 1) {
+    ctx.save()
+    ctx.setLineDash([8, 7])
+    ctx.strokeStyle = pal.runner
+    ctx.globalAlpha = 0.55
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    opts.path.forEach((q, i) => {
+      const [sx, sy] = px(q[0], q[1])
+      if (i === 0) ctx.moveTo(sx, sy)
+      else ctx.lineTo(sx, sy)
+    })
+    ctx.stroke()
+    ctx.restore()
   }
   line(opts.trail.tx, opts.trail.ty, pal.runnerTrail)
   // цвет пилота приходит шестью цифрами, две последние дописываем напролом:

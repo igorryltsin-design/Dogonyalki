@@ -55,6 +55,16 @@ let trained = false
 let kind: BrainKind = 'stub'
 export const featureSchemaVersion = FEATURE_SCHEMA_VERSION
 
+/** Каким мозгом летит муха: 'connectome' — схема из настоящего коннектома
+ *  FlyWire (connectome.ts), 'compact' — прежний упрощённый контур (10
+ *  признаков глаза + 48 весов). По умолчанию — коннектом. */
+export type FlyBrain = 'connectome' | 'compact'
+let flyBrain: FlyBrain = 'connectome'
+export const getFlyBrain = () => flyBrain
+export function setFlyBrain(b: FlyBrain) {
+  flyBrain = b
+}
+
 export function brainKind() {
   return kind
 }

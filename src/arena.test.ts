@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { CORRIDOR_HALF_M, DECOR_X0, DECOR_X1, flyModel, kidModel, makeScenery } from './Arena3D'
+import { CORRIDOR_HALF_M, DECOR_X0, DECOR_X1, THEME, flyModel, kidModel, makeScenery } from './Arena3D'
 
 /** Проверки арены без единого пикселя: что модель собрана как существо, а не
  *  как шарик, и что приметы поля стоят там, где должны, — вне дорожки бегунов
@@ -61,8 +61,8 @@ describe('модель мухи', () => {
   it('ни одна кисть мухи не забыта при перекраске', () => {
     const fly = flyModel(0x2e9e5b)
     // смена пилота и смена неба красят материалы по списку fly.skin. Если в
-    // модели появится кисть вне списка, она останется и зелёной в «сети
-    // школьника», и несветящейся ночью — ровно так лапы и оставались
+    // модели появится кисть вне списка, она останется и зелёной у
+    // полносвязной сети, и несветящейся ночью — ровно так лапы и оставались
     // мушино-зелёными, пока их не вынесли в список
     const used = new Set<THREE.Material>()
     for (const m of meshes(fly.obj)) {
@@ -108,7 +108,9 @@ describe('модель Шустрика', () => {
 describe('приметы поля', () => {
   const scenery = makeScenery()
   const masses = scenery.obj.children.filter((c) => (c as THREE.InstancedMesh).isInstancedMesh) as THREE.InstancedMesh[]
-  const [trunks, crowns, bushes, tufts] = masses
+  const byName = (n: string) => masses.find((m) => m.name === n)!
+  const [trunks, crowns, bushes, tufts] = ['trunks', 'crowns', 'bushes', 'tufts'].map(byName)
+  const [pineTrunks, pines, flowers, rocks] = ['pineTrunks', 'pines', 'flowers', 'rocks'].map(byName)
   const at = (m: THREE.InstancedMesh, i: number) => {
     const mat = new THREE.Matrix4()
     m.getMatrixAt(i, mat)
@@ -119,22 +121,38 @@ describe('приметы поля', () => {
     return { p, s }
   }
 
-  it('собраны в четыре массы — сцена не дорожает с числом деревьев', () => {
-    expect(masses.length).toBe(4)
+  it('собраны в восемь масс — сцена не дорожает с числом деревьев', () => {
+    expect(masses.length).toBe(8)
     expect([trunks.count, crowns.count, bushes.count, tufts.count]).toEqual([84, 84, 150, 420])
+    expect([pineTrunks.count, pines.count, flowers.count, rocks.count]).toEqual([60, 60, 320, 45])
   })
 
   it('дерево не распадается: ствол и крона делят один рост и поворот', () => {
-    for (let i = 0; i < trunks.count; i += 1) {
-      const a = at(trunks, i)
-      const b = at(crowns, i)
-      expect(b.p.distanceTo(a.p), `ствол и крона разошлись, №${i}`).toBeLessThan(1e-6)
-      expect(b.s.equals(a.s), `ствол и крона разного роста, №${i}`).toBe(true)
+    for (const [tr, cr] of [[trunks, crowns], [pineTrunks, pines]]) {
+      for (let i = 0; i < tr.count; i += 1) {
+        const a = at(tr, i)
+        const b = at(cr, i)
+        expect(b.p.distanceTo(a.p), `ствол и крона разошлись, №${i}`).toBeLessThan(1e-6)
+        expect(b.s.equals(a.s), `ствол и крона разного роста, №${i}`).toBe(true)
+      }
     }
   })
 
+  it('лес разноцветный: у крон свои оттенки, есть и осенние', () => {
+    const c = new THREE.Color()
+    const hexes = new Set<number>()
+    let warm = 0
+    for (let i = 0; i < crowns.count; i += 1) {
+      crowns.getColorAt(i, c)
+      hexes.add(c.getHex())
+      if (c.r > c.g) warm += 1
+    }
+    expect(hexes.size).toBeGreaterThanOrEqual(5)
+    expect(warm).toBeGreaterThan(3)
+  })
+
   it('ни одного дерева и куста на беговой дорожке', () => {
-    for (const m of [trunks, crowns, bushes]) {
+    for (const m of [trunks, crowns, bushes, pineTrunks, pines, flowers, rocks]) {
       for (let i = 0; i < m.count; i += 1) {
         const { p } = at(m, i)
         expect(Math.abs(p.z), 'прятает модель').toBeGreaterThan(CORRIDOR_HALF_M)
@@ -152,5 +170,43 @@ describe('приметы поля', () => {
       if (Math.abs(p.z) <= CORRIDOR_HALF_M) inside += 1
     }
     expect(inside).toBeGreaterThan(tufts.count / 2)
+  })
+})
+
+describe('живые модели', () => {
+  it('у мухи шесть лап на тазиках, шагают двумя треножниками', () => {
+    const fly = flyModel(0x2e9e5b)
+    expect(fly.legs.length).toBe(6)
+    for (const l of fly.legs) expect(l.pivot.children.length).toBeGreaterThanOrEqual(3)
+    const phases = fly.legs.map((l) => Math.round(l.phase * 100))
+    // ровно по три лапы в каждой фазе — иначе муха хромает
+    expect(phases.filter((p) => p === 0).length).toBe(3)
+    // в каждом треножнике лапы с обеих сторон
+    const tripod = fly.legs.filter((l) => l.phase === 0).map((l) => Math.sign(l.pivot.position.z))
+    expect(new Set(tripod).size).toBe(2)
+  })
+
+  it('у Шустрика есть лицо, и оно смотрит вперёд', () => {
+    const kid = kidModel()
+    expect(kid.faceMats.length).toBeGreaterThanOrEqual(3)
+    // все детали лица лежат на передней (+z) половине головы
+    const faceMeshes = meshes(kid.obj).filter((m) => kid.faceMats.includes(m.material as THREE.MeshLambertMaterial))
+    expect(faceMeshes.length).toBeGreaterThanOrEqual(6)
+    for (const m of faceMeshes) expect(m.position.z).toBeGreaterThan(0.15)
+  })
+})
+
+describe('ночь', () => {
+  // относительная яркость цвета по sRGB — грубая, но честная мерка
+  const lum = (hex: number) => {
+    const c = new THREE.Color(hex)
+    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+  }
+  it('не чёрная: небо и луг видно и на проекторе в светлом классе', () => {
+    expect(lum(THEME.night.sky)).toBeGreaterThan(0.025)
+    expect(lum(THEME.night.grass)).toBeGreaterThan(0.06)
+    // но всё-таки ночь: темнее дня
+    expect(lum(THEME.night.sky)).toBeLessThan(lum(THEME.day.sky) * 0.3)
+    expect(THEME.night.hemiI).toBeGreaterThanOrEqual(0.9)
   })
 })

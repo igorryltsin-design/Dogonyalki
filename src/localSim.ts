@@ -11,8 +11,9 @@
  *
  *  Детерминизм: все случайности — из rng(seed). Тот же seed — тот же погон. */
 
-import { features, readout, sgd } from './brain'
-import { applyEyeNoise, decodeImage, eyeHalfFov, eyeImage } from './eye'
+import { features, getFlyBrain, readout, sgd } from './brain'
+import { CircuitState, readoutC, steerFeatures } from './connectome'
+import { applyEyeExtras, applyEyeNoise, decodeImage, eyeHalfFov, eyeImage } from './eye'
 import { makeRng } from './rng'
 import type { BrainReadout, ChaseScenario, GameFrame, Pilot } from './types'
 
@@ -112,10 +113,40 @@ export function stepEncounter(pM0: number[], pM1: number[], pT0: number[], pT1: 
 /** Старт погоня: Огонёк в начале, Шустрик впереди на дальности range_m, чуть
  *  сбоку (off_axis_m), оба бегут по +X. Упрощённое зеркало spawn() стенда:
  *  аспекты «в лоб / сбоку / с земли / свободная расстановка» в игре не нужны. */
+/** Высота «прицела» на Шустрике, м: как у обычной расстановки (грудь). */
+const PATH_Z = 0.8
+
+/** Длины по нарисованному пути: накопленные от начала. */
+function pathLengths(path: number[][]): number[] {
+  const acc = [0]
+  for (let i = 1; i < path.length; i += 1) acc.push(acc[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]))
+  return acc
+}
+
+/** Где Шустрик на нарисованном пути в момент t: бежит со скоростью v_runner;
+ *  путь кончился — бежит дальше прямо, по последнему направлению. */
+export function runnerOnPath(sc: ChaseScenario, t: number, acc = pathLengths(sc.path!)): { p: number[]; v: number[] } {
+  const path = sc.path!
+  const s = sc.v_runner * t
+  const total = acc[acc.length - 1]
+  let i = 1
+  while (i < acc.length - 1 && acc[i] < s) i += 1
+  const a = path[i - 1]
+  const b = path[i]
+  const seg = Math.max(acc[i] - acc[i - 1], 1e-6)
+  const dir = [(b[0] - a[0]) / seg, (b[1] - a[1]) / seg]
+  const u = s > total ? seg + (s - total) : s - acc[i - 1]
+  return { p: [a[0] + dir[0] * u, a[1] + dir[1] * u, PATH_Z], v: [dir[0] * sc.v_runner, dir[1] * sc.v_runner, 0] }
+}
+
 function spawn(sc: ChaseScenario) {
   const pM: number[] = [0, 0, 0]
   const vM: number[] = [sc.v_chaser, 0, 0]
-  const raw = [1, (0.5 * sc.off_axis_m) / Math.max(sc.range_m, 1), 0.05]
+  if (sc.path && sc.path.length >= 2) {
+    const r = runnerOnPath(sc, 0)
+    return { pM, vM, pT: r.p, vT: r.v }
+  }
+  const raw = [1, ((sc.mirror ? -0.5 : 0.5) * sc.off_axis_m) / Math.max(sc.range_m, 1), 0.05]
   const n = norm(raw)
   const pT = add(pM, raw, sc.range_m / n)
   const vT = [sc.v_runner, 0, 0]
@@ -126,6 +157,11 @@ function spawn(sc: ChaseScenario) {
  *  Зеркало sim.py::target_accel: вираж, петляя, «ножницы», «нырок», комбинация. */
 export function runnerAccel(vT: number[], sc: ChaseScenario, t: number): number[] {
   if (sc.maneuver === 'straight' || sc.n_runner <= 0) return [0, 0, 0]
+  // зеркальная погоня: тот же манёвр, отражённый через ось бега (y → −y)
+  if (sc.mirror) {
+    const a = runnerAccel([vT[0], -vT[1], vT[2]], { ...sc, mirror: false }, t)
+    return [a[0], -a[1], a[2]]
+  }
   let lift = unit(cross(vT, [0, 0, 1]))
   if (norm(lift) < 0.2) lift = unit(cross(vT, [0, 1, 0]))
   const n = sc.n_runner * G
@@ -143,20 +179,28 @@ export function runnerAccel(vT: number[], sc: ChaseScenario, t: number): number[
     const front = Math.min(1, frac / 0.35, (1.6 - frac) / 0.35)
     a = [lift[0] * n * sign * front, lift[1] * n * sign * front, lift[2] * n * sign * front]
   } else if (m === 'dive') {
+    // «плавно виляет»: широкая медленная волна вбок, взятая не на всю силу.
+    // У стенда это был нырок вверх-вниз, но Шустрик — бегущий ребёнок, а не
+    // самолёт. Волна именно плавная: если гнать её на всю перегрузку, Шустрик
+    // оказывается быстрее тела любого догоняющего (у того предел 1,35 g) и не
+    // даёт осалить даже тому, кто подглядывает истинную геометрию, — а это
+    // уже не «плавное виляние», а тот же вираж на полном газу.
     const s = Math.sin((2 * Math.PI * t) / 6)
-    a = [vert[0] * s, vert[1] * s, vert[2] * s]
+    const amp = n * 0.6
+    a = [lift[0] * amp * s, lift[1] * amp * s, lift[2] * amp * s]
   } else {
-    // combo: петля с подскоком
-    const sH = n * (0.6 + 0.4 * Math.sin((2 * Math.PI * t) / 5))
-    a = [
-      lift[0] * sH + vert[0] * 0.45 * Math.sin((2 * Math.PI * t) / 3 + 1),
-      lift[1] * sH + vert[1] * 0.45 * Math.sin((2 * Math.PI * t) / 3 + 1),
-      lift[2] * sH + vert[2] * 0.45 * Math.sin((2 * Math.PI * t) / 3 + 1),
-    ]
+    // combo: петли с рывками — то круче, то положе, всё по земле
+    const sH = n * (0.6 + 0.4 * Math.sin((2 * Math.PI * t) / 5)) * (Math.sin((2 * Math.PI * t) / 3 + 1) > -0.3 ? 1 : -0.6)
+    a = [lift[0] * sH, lift[1] * sH, lift[2] * sH]
   }
+  void vert
+  // бегун не летает: ускорение только по земле, высота не меняется
+  a[2] = 0
   const mag = norm(a)
   if (mag > n && n > 0) a = a.map((x) => (x * n) / mag)
-  return perp(a, vT)
+  const out = perp(a, vT)
+  out[2] = 0
+  return out
 }
 
 /** Команда «поворачивай туда, куда смотришь»: из пеленга (азимут и угол места
@@ -198,6 +242,11 @@ export type LocalRunOpts = {
   /** подстройка детского пилота: упреждение по скорости пеленга и крутизна руления */
   kidLead?: number
   kidGain?: number
+  /** записывать в кадр активность всех нейронов схемы (для экрана «Мозг») */
+  recordCircuit?: boolean
+  /** «Побудь мухой»: руль ребёнка в этот миг, −1…1 по обеим осям
+   *  (yaw > 0 — вправо, pitch > 0 — вверх) */
+  manual?: () => { yaw: number; pitch: number }
 }
 
 export function* localRun(sc: ChaseScenario, opts?: LocalRunOpts): Generator<GameFrame> {
@@ -229,6 +278,11 @@ export function* localRun(sc: ChaseScenario, opts?: LocalRunOpts): Generator<Gam
   let lc11 = [0, 0, 0, 0]
   let lc10 = [0, 0]
   const halfFov = eyeHalfFov(sc.eye)
+  const pathAcc = sc.path && sc.path.length >= 2 ? pathLengths(sc.path) : null
+  // мозг из коннектома: своё состояние на каждую погоню
+  const useCircuit = pilot === 'fly' && getFlyBrain() === 'connectome'
+  const cst = useCircuit ? new CircuitState() : null
+  const pop = { az: 0, el: 0, first: true }
 
   while (t < sc.t_max) {
     const r = sub(tB.p, mB.p)
@@ -254,7 +308,7 @@ export function* localRun(sc: ChaseScenario, opts?: LocalRunOpts): Generator<Gam
     // Кадр честный: в поле — полное пятно, чуть за краем — приглушённое, дальше — ноль.
     const size = Math.min(0.35, 0.55 / Math.max(rngM, 0.5))
     const losAng = Math.acos(Math.min(1, Math.max(-1, ahead)))
-    const img = applyEyeNoise(eyeImage(truthAz, truthEl, size, losAng, sc.eye), sc.eye, rng)
+    const img = applyEyeExtras(applyEyeNoise(eyeImage(truthAz, truthEl, size, losAng, sc.eye), sc.eye, rng), sc.eye)
     const dec = decodeImage(img, sc.eye)
     const inFov = Math.abs(truthAz) <= halfFov && Math.abs(truthEl) <= halfFov
     let lock = dec.peak_rel > 0.25 && inFov
@@ -319,6 +373,11 @@ export function* localRun(sc: ChaseScenario, opts?: LocalRunOpts): Generator<Gam
       const gy = lock ? Math.tanh(elDot) : 0
       const feat = features(az, el, azDot, elDot, theta, loom, rho, gx, gy, lock)
       const readoutIn = [...feat, ...t4, ...t5, ...lc11, ...lc10]
+      let cf: Float32Array | null = null
+      if (cst) {
+        cst.step(img, sc.eye, dt)
+        cf = steerFeatures(cst, pop, dt)
+      }
       if (opts?.learn && lock) {
         // учитель тренировки — «пеленг + упреждение по измеренным угловым
         // скоростям». Берётся только из того, что видит глаз (азимут/угол места
@@ -328,12 +387,14 @@ export function* localRun(sc: ChaseScenario, opts?: LocalRunOpts): Generator<Gam
         const scale = 0.55
         const tPitch = Math.max(-1, Math.min(1, (el + lead * elDot) / scale))
         const tYaw = Math.max(-1, Math.min(1, (az + lead * azDot) / scale))
-        sgd(readoutIn, [tPitch, tYaw], opts.lr ?? 0.03)
+        // мозг из коннектома учится не здесь, а пробами (trainLocal.ts)
+        if (!cf) sgd(readoutIn, [tPitch, tYaw], opts.lr ?? 0.03)
       }
-      const { pitch, yaw } = readout(readoutIn)
+      const { pitch, yaw } = cf ? readoutC(cf) : readout(readoutIn)
       // копии: состояния t4/t5/lc переставляются на следующем шаге, а кадр
       // должен рассказать правду про тот миг, когда мозг ещё рулил
       brain = { feat: [...feat], t4: [...t4], t5: [...t5], lc11: [...lc11], lc10: [...lc10], out: [pitch, yaw] }
+      if (cst && opts?.recordCircuit) brain.circuit = Float32Array.from(cst.r)
       aCmd = clip(
         perp(
           add(
@@ -360,6 +421,24 @@ export function* localRun(sc: ChaseScenario, opts?: LocalRunOpts): Generator<Gam
       aCmd = steerFromAngles(pred.az + kidLead * kAzDot, pred.el + kidLead * kElDot, vM, sc.n_max, opts?.kidGain ?? 1.4)
       lookAz = pred.az
       lookEl = pred.el
+    } else if (pilot === 'manual') {
+      // ребёнок рулит сам: руль — это доля предельной перегрузки, как у мухи.
+      // Смотрит он туда же, куда видит глаз: другого окна у него нет
+      const c = opts?.manual ? opts.manual() : { yaw: 0, pitch: 0 }
+      const yaw = Math.max(-1, Math.min(1, c.yaw))
+      const pitch = Math.max(-1, Math.min(1, c.pitch))
+      aCmd = clip(
+        perp(
+          add(
+            up.map((x) => x * pitch * sc.n_max * G) as number[],
+            right.map((x) => x * yaw * sc.n_max * G) as number[],
+          ),
+          vM,
+        ),
+        sc.n_max,
+      )
+      lookAz = az
+      lookEl = el
     } else {
       // «честный читер»: ведёт по истинной геометрии, которой глаз не даёт
       aCmd = aOracle
@@ -372,7 +451,11 @@ export function* localRun(sc: ChaseScenario, opts?: LocalRunOpts): Generator<Gam
     const pT0 = [...tB.p]
     const vM0 = [...mB.v]
     const vT0 = [...tB.v]
-    integrate(tB, runnerAccel(vT, sc, t), dt)
+    if (pathAcc) {
+      const r = runnerOnPath(sc, t + dt, pathAcc)
+      tB.p = r.p
+      tB.v = r.v
+    } else integrate(tB, runnerAccel(vT, sc, t), dt)
     integrate(mB, aCmd, dt)
     const enc = stepEncounter(pM0, mB.p, pT0, tB.p, sc.tag_radius_m)
     cpa = Math.min(cpa, enc.cpa)
@@ -383,7 +466,7 @@ export function* localRun(sc: ChaseScenario, opts?: LocalRunOpts): Generator<Gam
     const errDeg =
       pilot === 'cheater'
         ? 0
-        : inFov && (pilot === 'fly' ? lock : true)
+        : inFov && (pilot === 'fly' || pilot === 'manual' ? lock : true)
           ? (Math.hypot(lookAz - truthAz, lookEl - truthEl) * 180) / Math.PI
           : null
 
